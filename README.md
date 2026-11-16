@@ -4,6 +4,7 @@
 PC와 모바일 브라우저에서 모두 플레이할 수 있고, 그래픽과 사운드는 전부 코드로 생성합니다.
 
 ## 플레이
+- **바로 플레이: https://0611gareddug.github.io/Randomizer-/** (GitHub Pages, `docs/` 폴더)
 - `dist/index.html` 파일 하나가 완성된 게임입니다. 정적 호스팅(GitHub Pages, Netlify 등)에 올리거나 로컬 서버로 열면 됩니다.
 - 온라인 대전은 PeerJS 공개 중개 서버로 연결한 뒤 플레이어끼리 직접(WebRTC) 통신합니다. 봇전과 연습장은 인터넷 없이도 동작합니다.
 
