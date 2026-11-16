@@ -23,7 +23,7 @@ R.mobile = mobile;
 
 // ── 저장 데이터 ──
 const profile = store.get('profile', null) || { name: '슬라임' + ((Math.random() * 9000 + 1000) | 0), color: SLIME_COLORS[(Math.random() * SLIME_COLORS.length) | 0], face: 0, hat: 0 };
-const settings = Object.assign({ sfx: 70, music: 45, shake: true, dmgNum: true, lowSpec: false, fps: false, btnSize: 1, aimAssist: true }, store.get('settings', {}));
+const settings = Object.assign({ sfx: 70, music: 45, shake: true, dmgNum: true, lowSpec: false, fps: false, btnSize: 1, uiSize: 1, aimAssist: true }, store.get('settings', {}));
 const codex = Object.assign({ p: [], m: [], s: [], t: [] }, store.get('codex', {}));
 const stats = Object.assign({ matches: 0, wins: 0, kills: 0, deaths: 0, dmg: 0, best: 0, legend: 0, loots: 0, wk: {} }, store.get('stats', {}));
 let offlineCfg = Object.assign({ mode: 'dm', mapId: 'random', bots: 5, botDiff: 1, timeLimit: 300, killLimit: 20 }, store.get('offlineCfg', {}));
@@ -35,6 +35,8 @@ function applySettings() {
   R.shakeOn = settings.shake; R.dmgNumOn = settings.dmgNum;
   if (R.lowSpec !== settings.lowSpec) { R.lowSpec = settings.lowSpec; R.resize(); }
   document.documentElement.style.setProperty('--btn', settings.btnSize);
+  document.documentElement.style.setProperty('--ui', settings.uiSize);
+  R.uiScale = settings.uiSize;
 }
 function codexAdd(slot, idx) {
   if (!codex[slot].includes(idx)) { codex[slot].push(idx); store.set('codex', codex); return true; }
@@ -112,7 +114,7 @@ const syncLobby = bindSeg($('scrLobby'), 'data-lkey', (k) => lobbySettingsCache[
   S.setSettings({ [k]: val });
 });
 const syncSettingsUI = (() => {
-  const s = bindSeg($('scrSettings'), 'data-skey', (k) => settings[k], (k, v) => { settings[k] = k === 'btnSize' ? +v : v === 'true'; saveSettings(); applySettings(); });
+  const s = bindSeg($('scrSettings'), 'data-skey', (k) => settings[k], (k, v) => { settings[k] = (k === 'btnSize' || k === 'uiSize') ? +v : v === 'true'; saveSettings(); applySettings(); });
   return () => { $('setSfx').value = settings.sfx; $('setMusic').value = settings.music; s(); };
 })();
 $('setSfx').addEventListener('input', (e) => { settings.sfx = +e.target.value; saveSettings(); applySettings(); });
