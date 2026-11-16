@@ -27,5 +27,5 @@ let html = readFileSync('src/index.html', 'utf8');
 html = html.replace('/*__CSS__*/', () => css).replace('/*__JS__*/', () => code.replace(/<\/script/gi, '<\\/script'));
 html = html.replace(/<!--[\s\S]*?-->/g, '').replace(/\n\s*/g, '\n');
 writeFileSync(`${out}/index.html`, html);
-if (!dev) { mkdirSync('docs', { recursive: true }); writeFileSync('docs/index.html', html); writeFileSync('docs/.nojekyll', ''); }
+if (!dev) { mkdirSync('docs', { recursive: true }); writeFileSync('docs/index.html', html); writeFileSync('docs/.nojekyll', ''); writeFileSync('index.html', html); writeFileSync('.nojekyll', ''); }
 console.log(`${out}/index.html`, (html.length / 1024).toFixed(1) + ' KB');
