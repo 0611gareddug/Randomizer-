@@ -102,14 +102,14 @@ export function botThink(g, p, dt) {
   if (t) {
     const d = Math.sqrt(dist2(p.x, p.y, t.x, t.y));
     const bs = w.b.hitscan ? 99999 : w.b.spd;
-    const lt = d / bs * D.lead;
+    const lt = (w.b.charge ? w.b.charge : d / bs) * D.lead;
     const tx = t.x + (t.vx || 0) * lt, ty = t.y + (t.vy || 0) * lt;
     const want = Math.atan2(ty - p.y, tx - p.x) + ai.noise;
     p.aim += angDiff(p.aim, want) * Math.min(1, D.turn * dt);
     inp.aim = p.aim;
     const facing = Math.abs(angDiff(p.aim, want)) < 0.3;
     if (ai.reactT <= 0 && facing && d < range * 1.05 && p.tauntT <= 0) inp.fire = true;
-    if (ai.reactT <= 0 && d < mw.range + (t.r || 6) + 3 && p.meleeCd <= 0) inp.meleeN++;
+    if (ai.reactT <= 0 && d < mw.range + (t.r || 6) + 12 && p.meleeCd <= 0) inp.meleeN++;
     // 스킬
     if (p.skillCd <= 0 && ai.reactT <= 0 && Math.random() < D.skill * dt * 3) {
       const s = SKILL[p.lo.s].id;

@@ -51,7 +51,7 @@ export class ClientWorld {
       const f = a[6];
       const wasAlive = p.alive;
       p.alive = !!(f & 1); p.invulnT = f & 2 ? 1 : 0; p.shieldT = f & 4 ? 1 : 0; p.burnT = f & 8 ? 1 : 0;
-      p.hurtT = f & 256 ? 0.1 : p.hurtT; p.healT = f & 128 ? 1 : 0; p.reloadT = f & 64 ? 1 : 0;
+      p.hurtT = f & 256 ? 0.1 : p.hurtT; p.healT = f & 128 ? 1 : 0; p.reloadT = f & 64 ? 1 : 0; p.chargeT = f & 8192 ? 1 : 0;
       p.hp = a[4]; p.maxHp = a[5]; p.warp = a[7];
       p.lo.p = a[8]; p.lo.m = a[9]; p.lo.s = a[10]; p.lo.t = a[11]; p.ammo = a[12]; p.reloadPct = a[13];
       p.skillCd = a[14]; p.meleeCd = a[15]; p.respawnT = a[16]; p.chill = a[17];
@@ -161,6 +161,13 @@ export class Presenter {
           const a = R.anim.get(p.id); if (a) a.recoil = 0.07;
           this.s(SHOT_SFX[w.id] || 'pea', p.x, p.y, e[1] === me ? 0.8 : 0.6);
           if (e[1] === me) { if (w.id === 'shotgun' || w.id === 'sniper' || w.id === 'blackhole') R.shake(1.5); else if (w.id !== 'dryer') R.shake(0.4); }
+          break;
+        }
+        case 'chg': {
+          const p = W.byId.get(e[1]); if (!p) break;
+          R.charge(e[1], e[2], e[3], PRIMARY[e[4]].b.range || 360);
+          if (this.isClient) p.aim = e[2];
+          this.s('charge', p.x, p.y, e[1] === me ? 0.7 : 1);
           break;
         }
         case 'ray': R.ray(e[1], e[2], e[3], e[4], e[5]); if (e[1] === 'zap') this.s('zap', e[4], e[5]); else R.burst(e[4], e[5], e[1] === 'laser' ? '#ff6b7a' : '#fff6c9', 5, 60, 0.25); break;

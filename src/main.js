@@ -375,8 +375,8 @@ function renderCodex() {
   const it = slot.list[codexSel], got = codex[codexTab].includes(codexSel);
   let st = '';
   if (got) {
-    if (codexTab === 'p') { const b = it.b; st = `<span>피해 ${b.dmg || '폭발'}${b.count ? ' ×' + b.count : ''}</span><span>연사 ${it.rate}/초</span><span>탄창 ${it.mag}</span><span>재장전 ${it.reload}초</span>${b.boom ? `<span>폭발 ${b.boom}</span>` : ''}`; }
-    else if (codexTab === 'm') st = `<span>피해 ${it.dmg}</span><span>쿨다운 ${it.cd}초</span><span>사거리 ${it.range}</span><span>넉백 ${it.knock}</span>`;
+    if (codexTab === 'p') { const b = it.b; st = `<span>피해 ${b.dmg || '폭발'}${b.count ? ' ×' + b.count : ''}</span><span>연사 ${it.rate.toFixed(1)}/초</span><span>탄창 ${it.mag}</span><span>재장전 ${it.reload.toFixed(1)}초</span>${b.boom ? `<span>폭발 ${b.boom}</span>` : ''}${b.charge ? `<span>조준 예고 ${b.charge}초</span>` : ''}`; }
+    else if (codexTab === 'm') st = `<span>피해 ${it.dmg}</span><span>쿨다운 ${it.cd.toFixed(2)}초</span><span>사거리 ${it.range}</span><span>넉백 ${it.knock}</span>`;
     else if (codexTab === 's') st = `<span>쿨다운 ${it.cd}초</span>`;
     else st = `<span>끝까지 추면 체력 +10</span>`;
   }

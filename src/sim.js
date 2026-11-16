@@ -26,6 +26,7 @@ export function stepMovement(p, map, dt, ev, vortexes) {
   if (p.slowT > 0) spd *= 0.62;
   if (p.chill > 0) spd *= 1 - p.chill * 0.12;
   if (p.tauntT > 0) spd *= 0.3;
+  if (p.chargeT > 0) spd *= 0.55;
   if (p.frozenT > 0 || p.stunT > 0 || !p.alive) spd = 0;
   const tile = tileAtPx(map, p.x, p.y);
   const icy = tile === 3 || ev === 'ice' || p.slipT > 0;
@@ -80,7 +81,7 @@ function makePlayer(id, o) {
     lo: { p: 0, m: 0, s: 0, t: 0 }, ammo: 0, reloadT: 0, fireCd: 0, burstLeft: 0, burstT: 0,
     meleeCd: 0, swingT: 9, reflectT: 0, skillCd: 0, tauntT: 0, tauntCd: 0,
     slowT: 0, chill: 0, chillT: 0, frozenT: 0, stunT: 0, burnT: 0, burnTick: 0, burnBy: -1, slipT: 0,
-    shieldT: 0, giantT: 0, healT: 0, hurtT: 0,
+    shieldT: 0, giantT: 0, healT: 0, hurtT: 0, chargeT: 0, chargeAng: 0,
     kills: 0, deaths: 0, streak: 0, best: 0, dmg: 0, score: 0, loots: 0, taunts: 0,
     lastHitBy: -1, lastHitT: -99, lastKiller: -1, multi: 0, multiT: -99, warp: 0,
     in: { mx: 0, my: 0, aim: 0, fire: false, fireN: 0, meleeN: 0, skillN: 0, tauntN: 0, reloadN: 0 },
@@ -157,7 +158,7 @@ export class Game {
     }
     p.x = best.x + rand(-3, 3); p.y = best.y + rand(-3, 3); p.vx = p.vy = 0;
     p.alive = true; p.hp = p.maxHp = MAX_HP; p.invulnT = 2; p.warp++;
-    p.slowT = p.chill = p.frozenT = p.stunT = p.burnT = p.shieldT = p.giantT = p.healT = p.tauntT = p.slipT = 0;
+    p.slowT = p.chill = p.frozenT = p.stunT = p.burnT = p.shieldT = p.giantT = p.healT = p.tauntT = p.slipT = p.chargeT = 0;
     const w = PRIMARY[p.lo.p];
     p.ammo = w.mag; p.reloadT = 0; p.fireCd = 0.2; p.burstLeft = 0; p.meleeCd = 0; p.skillCd = 0; p.tauntCd = 0; p.swingT = 9;
     p.lastHitT = -99; p.killedBy = null;
@@ -230,6 +231,8 @@ export class Game {
     p.swingT += dt; p.reflectT = Math.max(0, p.reflectT - dt);
     p.meleeCd = Math.max(0, p.meleeCd - dt); p.skillCd = Math.max(0, p.skillCd - dt); p.tauntCd = Math.max(0, p.tauntCd - dt);
     p.fireCd = Math.max(0, p.fireCd - dt);
+    // 즉발 무기 예고 후 발사
+    if (p.chargeT > 0) { p.chargeT -= dt; if (p.chargeT <= 0) { p.chargeT = 0; this.releaseCharge(p); } }
     // 이동
     if (!p.remote) { if (this.state === 'count') { p.in.mx = p.in.my = 0; } stepMovement(p, this.map, dt, ev, vort); }
     else p.r = 6 * playerScale(p, ev);
@@ -287,6 +290,7 @@ export class Game {
     const mx = p.x + Math.cos(a0) * (p.r + 4), my = p.y + Math.sin(a0) * (p.r + 4);
     // 총구가 벽 안이면 몸 중심에서 발사
     const ox = solidPx(this.map, mx, my) ? p.x : mx, oy = solidPx(this.map, mx, my) ? p.y : my;
+    if (b.charge) { p.chargeT = b.charge; p.chargeAng = a0; this.ev.push(['chg', p.id, Math.round(a0 * 1000) / 1000, b.charge, p.lo.p]); return; }
     this.ev.push(['shot', p.id, p.lo.p]);
     if (b.hitscan) { this.hitscan(p, w, ox, oy, a0 + rand(-b.spread, b.spread)); return; }
     const n = b.count || 1, spdMul = this.event?.id === 'speedbullet' ? 2 : 1;
@@ -423,13 +427,23 @@ export class Game {
     this.rollLoadout(v);
   }
 
+  releaseCharge(p) {
+    if (!p.alive || this.state !== 'play') return;
+    const w = PRIMARY[p.lo.p]; if (!w.b.charge) return;
+    const a = p.chargeAng, mx = p.x + Math.cos(a) * (p.r + 4), my = p.y + Math.sin(a) * (p.r + 4);
+    const ox = solidPx(this.map, mx, my) ? p.x : mx, oy = solidPx(this.map, mx, my) ? p.y : my;
+    p.aim = a;
+    this.ev.push(['shot', p.id, p.lo.p]);
+    this.hitscan(p, w, ox, oy, a);
+  }
+
   // ── 근접 ──
   melee(p) {
     const w = MELEE[p.lo.m];
     p.meleeCd = w.cd; p.swingT = 0;
     if (w.reflect) p.reflectT = 0.22;
     this.ev.push(['sw', p.id, p.lo.m, Math.round(p.aim * 100) / 100]);
-    if (w.lunge) this.impulse(p, Math.cos(p.aim) * w.lunge, Math.sin(p.aim) * w.lunge);
+    this.impulse(p, Math.cos(p.aim) * (w.lunge || 120), Math.sin(p.aim) * (w.lunge || 120));
     const mul = this.dmgMul(p), reach = w.range * (p.giantT > 0 ? 1.3 : 1);
     let hitAny = false;
     for (const t of this.targetList(p)) {
@@ -813,7 +827,7 @@ export class Game {
       let f = 0;
       if (p.alive) f |= 1; if (p.invulnT > 0) f |= 2; if (p.shieldT > 0) f |= 4; if (p.burnT > 0) f |= 8;
       if (p.frozenT > 0) f |= 16; if (p.tauntT > 0) f |= 32; if (p.reloadT > 0) f |= 64; if (p.healT > 0) f |= 128;
-      if (p.hurtT > 0) f |= 256; if (p.stunT > 0) f |= 512; if (p.slowT > 0) f |= 1024; if (p.giantT > 0) f |= 2048; if (p.slipT > 0) f |= 4096;
+      if (p.hurtT > 0) f |= 256; if (p.stunT > 0) f |= 512; if (p.slowT > 0) f |= 1024; if (p.giantT > 0) f |= 2048; if (p.slipT > 0) f |= 4096; if (p.chargeT > 0) f |= 8192;
       const w = PRIMARY[p.lo.p];
       return [p.id, Math.round(p.x * 10) / 10, Math.round(p.y * 10) / 10, Math.round(p.aim * 100) / 100, Math.ceil(p.hp), p.maxHp, f, p.warp,
         p.lo.p, p.lo.m, p.lo.s, p.lo.t, p.ammo, p.reloadT > 0 ? Math.round((1 - p.reloadT / w.reload) * 100) : 100,

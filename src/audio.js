@@ -104,6 +104,7 @@ export function sfx(name, vol = 1, pan = 0) {
     case 'alarm': for (let i = 0; i < 3; i++) { osc('square', 880, 880, t + i * 0.22, 0.1, 0.12 * v, 0); osc('square', 660, 660, t + i * 0.22 + 0.11, 0.1, 0.12 * v, 0); } break;
     case 'beep': osc('square', 660, 660, t, 0.12, 0.15 * v, 0); break;
     case 'go': osc('square', 990, 990, t, 0.35, 0.16 * v, 0); osc('square', 1320, 1320, t, 0.35, 0.08 * v, 0); break;
+    case 'charge': osc('sine', 300, 1400, t, 0.32, 0.12 * v, pan); osc('square', 600, 2400, t + 0.05, 0.25, 0.03 * v, pan); break;
     case 'click': osc('square', 1100, 1100, t, 0.025, 0.08 * v, 0); break;
     case 'slip': osc('sine', 300, 1500, t, 0.25, 0.2 * v, pan); break;
     case 'teleport': osc('sine', 300, 2400, t, 0.18, 0.2 * v, pan); osc('square', 2400, 300, t + 0.1, 0.12, 0.06 * v, pan); break;

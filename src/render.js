@@ -16,7 +16,7 @@ export class Renderer {
     this.camX = 0; this.camY = 0; this.shakeT = 0; this.shakeA = 0; this.sx = 0; this.sy = 0;
     this.lowSpec = false; this.shakeOn = true; this.dmgNumOn = true;
     this.parts = new Pool(() => ({ x: 0, y: 0, vx: 0, vy: 0, life: 0, max: 1, size: 1, color: '#fff', kind: 0, grav: 0, drag: 0 }), 900);
-    this.nums = []; this.rays = []; this.rings = []; this.bubbles = new Map(); this.pigeons = [];
+    this.nums = []; this.charges = new Map(); this.rays = []; this.rings = []; this.bubbles = new Map(); this.pigeons = [];
     this.anim = new Map(); this.time = 0; this.hurtFlash = 0; this.hitMark = 0;
     this.mobile = false; this.uiScale = 1;
     this.smokeOff = [];
@@ -31,7 +31,7 @@ export class Renderer {
     this.belts = [];
     for (let j = 0; j < map.h; j++) for (let i = 0; i < map.w; i++) { const t = map.grid[j * map.w + i]; if (t >= 4 && t <= 7) this.belts.push([i, j, t]); }
     this.splatCount = 0;
-    this.parts.clear(); this.nums.length = 0; this.rays.length = 0; this.rings.length = 0; this.bubbles.clear(); this.anim.clear(); this.pigeons.length = 0;
+    this.parts.clear(); this.nums.length = 0; this.rays.length = 0; this.rings.length = 0; this.bubbles.clear(); this.charges.clear(); this.anim.clear(); this.pigeons.length = 0;
   }
 
   resize() {
@@ -64,6 +64,7 @@ export class Renderer {
     this.nums.push({ x: x + rand(-4, 4), y, vy: -38, life: 0.8, text: String(text), color, big: !!big });
     if (this.nums.length > 40) this.nums.shift();
   }
+  charge(id, ang, dur, range) { this.charges.set(id, { ang, t: dur, max: dur, range }); }
   bubble(id, text) { this.bubbles.set(id, { text, t: 2.2 }); }
   pigeon(x, y) { this.pigeons.push({ x, y, t: 0 }); }
   splat(x, y, color) {
@@ -195,6 +196,19 @@ export class Renderer {
     for (const bl of W.bullets) {
       if (!inView(bl.x, bl.y, 8)) continue;
       this.drawBullet(b, bl, bl.x - cx, bl.y - cy);
+    }
+    // 즉발 무기 예고선
+    for (const [id, c] of this.charges) {
+      c.t -= dt; const p = W.byId.get(id);
+      if (c.t <= 0 || !p || !p.alive) { this.charges.delete(id); continue; }
+      const ex = p.x + Math.cos(c.ang) * c.range, ey = p.y + Math.sin(c.ang) * c.range;
+      const f = raycast(this.map, p.x, p.y, ex, ey), lx = p.x + (ex - p.x) * f, ly = p.y + (ey - p.y) * f;
+      const k = 1 - c.t / c.max, blink = ((this.time * 20) | 0) % 2;
+      b.globalAlpha = 0.35 + k * 0.55;
+      b.strokeStyle = blink && k > 0.6 ? '#ffffff' : '#ff3b4f'; b.lineWidth = k > 0.6 ? 2 : 1;
+      b.beginPath(); b.moveTo(p.x - cx, p.y - cy); b.lineTo(lx - cx, ly - cy); b.stroke();
+      b.fillStyle = '#ff3b4f'; b.fillRect(Math.round(lx - cx) - 1, Math.round(ly - cy) - 1, 3, 3);
+      b.globalAlpha = 1;
     }
     // 모바일 조준선
     if (opt.aimLine && me) this.drawAim(b, me, cx, cy, opt.aimLine);

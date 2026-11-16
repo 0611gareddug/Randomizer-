@@ -23,7 +23,7 @@ export const PRIMARY = [
     b: { t: 'duck', spd: 200, dmg: 18, life: 1.6, rad: 4, spread: 0.02, bounce: 3, boom: 46, boomR: 34 } },
   { id: 'bubble', name: '비눗방울 기관총', r: 1, desc: '맞으면 끈적해져 느려진다.', rate: 9, mag: 40, reload: 1.6, auto: true,
     b: { t: 'bubble', spd: 150, dmg: 6, life: 1.4, rad: 4, spread: 0.2, slow: 0.7 } },
-  { id: 'sniper', name: '망원경 저격총', r: 1, desc: '즉발 저격. 맞으면 아프다, 진짜로.', rate: 0.9, mag: 4, reload: 2.0, auto: false,
+  { id: 'sniper', name: '망원경 저격총', r: 1, desc: '빨간 조준선을 0.35초 보여준 뒤 즉발 저격. 맞으면 아프다.', rate: 0.9, mag: 4, reload: 2.0, auto: false,
     b: { t: 'snipe', hitscan: true, dmg: 82, range: 420, spread: 0 } },
   { id: 'icecream', name: '아이스크림 블래스터', r: 1, desc: '차가운 콘 조각. 3번 맞으면 꽁꽁.', rate: 6, mag: 24, reload: 1.5, auto: true,
     b: { t: 'ice', spd: 280, dmg: 9, life: 0.6, rad: 3, spread: 0.08, chill: 1 } },
@@ -31,7 +31,7 @@ export const PRIMARY = [
     b: { t: 'flame', spd: 170, dmg: 3.2, life: 0.42, rad: 4, spread: 0.22, pierce: true, burn: 1 } },
   { id: 'frisbee', name: '프리스비 런처', r: 2, desc: '벽을 타고 4번 튕기는 날카로운 원반.', rate: 2.2, mag: 6, reload: 1.5, auto: false,
     b: { t: 'disc', spd: 290, dmg: 26, life: 2.0, rad: 4, spread: 0.02, bounce: 4, pierce: true } },
-  { id: 'laser', name: '레이저 포인터 캐논', r: 2, desc: '고양이도 놀라는 관통 레이저.', rate: 1.6, mag: 5, reload: 1.7, auto: false,
+  { id: 'laser', name: '레이저 포인터 캐논', r: 2, desc: '짧은 예고 후 일직선을 꿰뚫는 관통 레이저.', rate: 1.6, mag: 5, reload: 1.7, auto: false,
     b: { t: 'laser', hitscan: true, pierce: true, dmg: 44, range: 360, spread: 0 } },
   { id: 'popcorn', name: '팝콘 기관총', r: 2, desc: '날아가다 톡! 세 갈래로 터진다.', rate: 5, mag: 20, reload: 1.6, auto: true,
     b: { t: 'kernel', spd: 260, dmg: 9, life: 0.28, rad: 3, spread: 0.06, split: 3 } },
@@ -43,7 +43,7 @@ export const PRIMARY = [
 
 // ── 근접무기 10종 ── range: 사거리, arc: 휘두름 각도(라디안), cd: 쿨다운
 export const MELEE = [
-  { id: 'onion', name: '대파', r: 0, desc: '빠르게 찰싹찰싹. 냄새는 덤.', dmg: 24, range: 22, arc: 1.7, cd: 0.38, knock: 70 },
+  { id: 'onion', name: '대파', r: 0, desc: '휘두르며 살짝 돌진. 빠르게 찰싹찰싹.', dmg: 24, range: 22, arc: 1.7, cd: 0.38, knock: 70 },
   { id: 'bat', name: '알루미늄 배트', r: 0, desc: '홈런! 멀리 날려버린다.', dmg: 30, range: 24, arc: 1.6, cd: 0.6, knock: 260 },
   { id: 'hammer', name: '뿅망치', r: 0, desc: '뿅! 맞은 상대는 잠깐 어지럽다.', dmg: 15, range: 20, arc: 1.5, cd: 0.45, knock: 40, stun: 0.5 },
   { id: 'pan', name: '무쇠 프라이팬', r: 1, desc: '휘두르는 순간 날아오는 탄을 되받아친다.', dmg: 30, range: 22, arc: 2.0, cd: 0.55, knock: 120, reflect: true },
@@ -83,6 +83,28 @@ export const TAUNT = [
 for (const w of PRIMARY) { w.rate *= 0.8; w.reload *= 1.12; if (w.b.spd) { w.b.spd *= 0.78; w.b.life /= 0.78 * 1.04; } }
 for (const m of MELEE) m.cd *= 1.15;
 for (const s of SKILL) s.cd = Math.round(s.cd * 1.15);
+
+// ── 밸런스: 등급별 계단식 (일반 < 희귀 < 영웅 < 전설) ──
+const tune = (list, id, f) => f(list.find((x) => x.id === id));
+const BAL = {
+  pea: { dmg: 14 }, smg: { dmg: 7 }, shotgun: { dmg: 7.5 }, baguette: { dmg: 11 },
+  revolver: { dmg: 27 }, duck: { dmg: 14, boom: 45, spd: 1.15 }, bubble: { dmg: 10.5, spd: 1.5 }, sniper: { dmg: 78, charge: 0.35, rate: 1.25 }, icecream: { dmg: 7.5 },
+  dryer: { dmg: 7.6, life: 1.25 }, frisbee: { dmg: 25 }, laser: { dmg: 58, charge: 0.3 }, popcorn: { dmg: 15, spd: 1.2 },
+  blackhole: { boom: 34 }, ukulele: { dmg: 22 },
+};
+for (const w of PRIMARY) {
+  const o = BAL[w.id]; if (!o) continue;
+  if (o.dmg !== undefined) w.b.dmg = o.dmg;
+  if (o.boom !== undefined) w.b.boom = o.boom;
+  if (o.spd && w.b.spd) { w.b.spd *= o.spd; w.b.life /= o.spd; }
+  if (o.life) w.b.life *= o.life;
+  if (o.charge) w.b.charge = o.charge;
+  if (o.rate) w.rate *= o.rate;
+}
+// 근접: 공통 돌진 + 사거리/피해 상향 (접근 위험에 대한 보상)
+for (const m of MELEE) { m.range = Math.round(m.range * 1.3); m.dmg = Math.round(m.dmg * 1.35); }
+const MBAL = { straw: { dmg: 40 }, hammer: { dmg: 26, stun: 0.6 }, swatter: { dmg: 64, zap: 36 }, saber: { dmg: 90 }, sausage: { dmg: 32 }, greatsword: { dmg: 62 }, onion: { dmg: 34 } };
+for (const m of MELEE) Object.assign(m, MBAL[m.id] || {});
 
 export const SLOTS = [
   { key: 'p', name: '주무기', list: PRIMARY },
