@@ -1,6 +1,6 @@
 // 게임 시뮬레이션 (오프라인/방장 전용 권한 서버)
-import { PRIMARY, MELEE, SKILL, TAUNT, EVENTS, rollItem, BOT_NAMES, SLIME_COLORS } from './data.js';
-import { getMap, moveCircle, tileAtPx, solidPx, raycast, lineOfSight, TILE } from './maps.js';
+import { PRIMARY, MELEE, SKILL, TAUNT, SUPER, EVENTS, rollItem, BOT_NAMES, SLIME_COLORS } from './data.js';
+import { getMap, moveCircle, tileAtPx, solidPx, raycast, lineOfSight, bushAt, TILE } from './maps.js';
 import { clamp, dist2, angDiff, rand, pick, shuffle, TAU } from './util.js';
 import { botThink, botInit } from './bot.js';
 
@@ -9,6 +9,7 @@ export const RESPAWN_TIME = 4.2;
 const BASE_SPEED = 70;
 export const MAX_HP = 140;
 const BULLET_LIST_MAX = 400;
+export const SUPER_CHARGE_DMG = 210; // 이만큼 맞히면 궁극기 완충
 
 // ── 공용 이동 물리 (방장과 클라이언트 예측이 동일 코드를 사용) ──
 export function playerScale(p, ev) {
@@ -27,6 +28,8 @@ export function stepMovement(p, map, dt, ev, vortexes) {
   if (p.chill > 0) spd *= 1 - p.chill * 0.12;
   if (p.tauntT > 0) spd *= 0.3;
   if (p.chargeT > 0) spd *= 0.55;
+  if (p.spinT > 0) spd *= 1.3;
+  if (p.leapT > 0) spd = 0;
   if (p.frozenT > 0 || p.stunT > 0 || !p.alive) spd = 0;
   const tile = tileAtPx(map, p.x, p.y);
   const icy = tile === 3 || ev === 'ice' || p.slipT > 0;
@@ -78,14 +81,14 @@ function makePlayer(id, o) {
   return {
     id, name: o.name, color: o.color, face: o.face | 0, hat: o.hat | 0, team: o.team ?? -1, bot: !!o.bot, remote: !!o.remote, dummy: !!o.dummy,
     x: 0, y: 0, vx: 0, vy: 0, r: 6, aim: 0, hp: MAX_HP, maxHp: MAX_HP, alive: false, respawnT: 0, invulnT: 0,
-    lo: { p: 0, m: 0, s: 0, t: 0 }, ammo: 0, reloadT: 0, fireCd: 0, burstLeft: 0, burstT: 0,
+    lo: { p: 0, m: 0, s: 0, t: 0, u: 0 }, superCh: 0, revealT: 0, spinT: 0, spinTick: 0, rushT: 0, rushHits: null, leapT: 0, leapX: 0, leapY: 0, barrageT: 0, ammo: 0, reloadT: 0, fireCd: 0, burstLeft: 0, burstT: 0,
     meleeCd: 0, swingT: 9, reflectT: 0, skillCd: 0, tauntT: 0, tauntCd: 0,
     slowT: 0, chill: 0, chillT: 0, frozenT: 0, stunT: 0, burnT: 0, burnTick: 0, burnBy: -1, slipT: 0,
     shieldT: 0, giantT: 0, healT: 0, hurtT: 0, chargeT: 0, chargeAng: 0,
     kills: 0, deaths: 0, streak: 0, best: 0, dmg: 0, score: 0, loots: 0, taunts: 0,
     lastHitBy: -1, lastHitT: -99, lastKiller: -1, multi: 0, multiT: -99, warp: 0,
-    in: { mx: 0, my: 0, aim: 0, fire: false, fireN: 0, meleeN: 0, skillN: 0, tauntN: 0, reloadN: 0 },
-    pn: { fireN: 0, meleeN: 0, skillN: 0, tauntN: 0, reloadN: 0 }, lastInputT: 0, killedBy: null, weaponKills: {},
+    in: { mx: 0, my: 0, aim: 0, fire: false, fireN: 0, meleeN: 0, skillN: 0, tauntN: 0, reloadN: 0, superN: 0 },
+    pn: { fireN: 0, meleeN: 0, skillN: 0, tauntN: 0, reloadN: 0, superN: 0 }, lastInputT: 0, killedBy: null, weaponKills: {},
   };
 }
 
@@ -144,7 +147,7 @@ export class Game {
   }
 
   rollLoadout(p) {
-    p.lo = { p: rollItem(PRIMARY), m: rollItem(MELEE), s: rollItem(SKILL), t: rollItem(TAUNT) };
+    p.lo = { p: rollItem(PRIMARY), m: rollItem(MELEE), s: rollItem(SKILL), t: rollItem(TAUNT), u: rollItem(SUPER) };
   }
   spawn(p) {
     const m = this.map;
@@ -158,7 +161,7 @@ export class Game {
     }
     p.x = best.x + rand(-3, 3); p.y = best.y + rand(-3, 3); p.vx = p.vy = 0;
     p.alive = true; p.hp = p.maxHp = MAX_HP; p.invulnT = 2; p.warp++;
-    p.slowT = p.chill = p.frozenT = p.stunT = p.burnT = p.shieldT = p.giantT = p.healT = p.tauntT = p.slipT = p.chargeT = 0;
+    p.slowT = p.chill = p.frozenT = p.stunT = p.burnT = p.shieldT = p.giantT = p.healT = p.tauntT = p.slipT = p.chargeT = p.spinT = p.rushT = p.leapT = p.barrageT = p.revealT = 0;
     const w = PRIMARY[p.lo.p];
     p.ammo = w.mag; p.reloadT = 0; p.fireCd = 0.2; p.burstLeft = 0; p.meleeCd = 0; p.skillCd = 0; p.tauntCd = 0; p.swingT = 9;
     p.lastHitT = -99; p.killedBy = null;
@@ -172,7 +175,7 @@ export class Game {
     const inp = p.in;
     inp.mx = clamp(+m.mx || 0, -1, 1); inp.my = clamp(+m.my || 0, -1, 1);
     inp.aim = +m.a || 0; inp.fire = !!m.f;
-    inp.fireN = m.fn | 0; inp.meleeN = m.mn | 0; inp.skillN = m.sn | 0; inp.tauntN = m.tn | 0; inp.reloadN = m.rn | 0;
+    inp.fireN = m.fn | 0; inp.meleeN = m.mn | 0; inp.skillN = m.sn | 0; inp.tauntN = m.tn | 0; inp.reloadN = m.rn | 0; inp.superN = m.un | 0;
     p.aim = inp.aim;
     if (m.w !== p.warp) return; // 순간이동 확인 전 위치는 무시
     if (!p.alive) return;
@@ -231,6 +234,8 @@ export class Game {
     p.swingT += dt; p.reflectT = Math.max(0, p.reflectT - dt);
     p.meleeCd = Math.max(0, p.meleeCd - dt); p.skillCd = Math.max(0, p.skillCd - dt); p.tauntCd = Math.max(0, p.tauntCd - dt);
     p.fireCd = Math.max(0, p.fireCd - dt);
+    p.revealT = Math.max(0, p.revealT - dt);
+    this.updateSuperState(p, dt);
     // 즉발 무기 예고 후 발사
     if (p.chargeT > 0) { p.chargeT -= dt; if (p.chargeT <= 0) { p.chargeT = 0; this.releaseCharge(p); } }
     // 이동
@@ -259,7 +264,7 @@ export class Game {
     const busy = p.frozenT > 0 || p.stunT > 0;
     const firePressed = inp.fireN !== pn.fireN;
     if (inp.tauntN !== pn.tauntN && p.tauntCd <= 0 && !busy) { p.tauntT = 2.2; p.tauntCd = 3.5; this.ev.push(['emo', p.id, p.lo.t]); }
-    if (p.tauntT > 0 && (firePressed || inp.meleeN !== pn.meleeN || inp.skillN !== pn.skillN)) p.tauntT = 0; // 공격하면 도발 취소
+    if (p.tauntT > 0 && (firePressed || inp.meleeN !== pn.meleeN || inp.skillN !== pn.skillN || inp.superN !== pn.superN)) p.tauntT = 0; // 공격하면 도발 취소
     if (!busy && p.tauntT <= 0) {
       // 점사 진행
       if (p.burstLeft > 0) { p.burstT -= dt; if (p.burstT <= 0 && p.ammo > 0 && p.reloadT <= 0) { this.fireOnce(p, w); p.burstLeft--; p.burstT = 0.07; } }
@@ -274,18 +279,19 @@ export class Game {
       }
       if (inp.reloadN !== pn.reloadN && p.ammo < w.mag && p.reloadT <= 0) this.startReload(p, w);
       if (inp.meleeN !== pn.meleeN && p.meleeCd <= 0) this.melee(p);
-      if (inp.skillN !== pn.skillN && p.skillCd <= 0) this.skill(p);
+      if (inp.skillN !== pn.skillN && p.skillCd <= 0) { p.revealT = 1; this.skill(p); }
+      if (inp.superN !== pn.superN && p.superCh >= 1 && p.leapT <= 0) { p.revealT = 1.2; this.doSuper(p); }
     }
     this.syncPresses(p);
     if (p.ammo <= 0 && p.reloadT <= 0 && p.burstLeft <= 0) this.startReload(p, w);
   }
-  syncPresses(p) { const pn = p.pn, inp = p.in; pn.fireN = inp.fireN; pn.meleeN = inp.meleeN; pn.skillN = inp.skillN; pn.tauntN = inp.tauntN; pn.reloadN = inp.reloadN; }
+  syncPresses(p) { const pn = p.pn, inp = p.in; pn.fireN = inp.fireN; pn.meleeN = inp.meleeN; pn.skillN = inp.skillN; pn.tauntN = inp.tauntN; pn.reloadN = inp.reloadN; pn.superN = inp.superN; }
   startReload(p, w) { if (p.reloadT > 0) return; p.reloadT = w.reload; p.burstLeft = 0; this.ev.push(['sfx', 'reload', p.x | 0, p.y | 0]); }
 
   dmgMul(p) { let m = 1; if (p.giantT > 0) m *= 1.3; if (this.event?.id === 'giant') m *= 1.15; return m; }
 
   fireOnce(p, w) {
-    p.ammo--;
+    p.ammo--; p.revealT = 1;
     const b = w.b, a0 = p.aim;
     const mx = p.x + Math.cos(a0) * (p.r + 4), my = p.y + Math.sin(a0) * (p.r + 4);
     // 총구가 벽 안이면 몸 중심에서 발사
@@ -381,7 +387,9 @@ export class Game {
     amt = Math.max(1, Math.round(amt));
     t.hp -= amt; t.hurtT = 0.12;
     if (att && att !== t) { t.lastHitBy = att.id; att.dmg += amt; }
-    t.lastHitT = this.clock;
+    t.lastHitT = this.clock; t.revealT = Math.max(t.revealT, 0.7);
+    if (att && att !== t && label && label.s !== 'u' && !t.dummy && att.superCh < 1) { att.superCh = Math.min(1, att.superCh + amt / SUPER_CHARGE_DMG); if (att.superCh >= 1) this.ev.push(['sready', att.id]); }
+    else if (att && att !== t && t.dummy && label && label.s !== 'u') att.superCh = Math.min(1, att.superCh + amt / SUPER_CHARGE_DMG);
     if (t.tauntT > 0) t.tauntT = 0;
     this.ev.push(['hit', t.id, amt, t.x | 0, (t.y - t.r) | 0, att ? att.id : -1, silent ? 1 : 0]);
     if (kb) this.impulse(t, dx * kb, dy * kb);
@@ -440,7 +448,7 @@ export class Game {
   // ── 근접 ──
   melee(p) {
     const w = MELEE[p.lo.m];
-    p.meleeCd = w.cd; p.swingT = 0;
+    p.meleeCd = w.cd; p.swingT = 0; p.revealT = 1;
     if (w.reflect) p.reflectT = 0.22;
     this.ev.push(['sw', p.id, p.lo.m, Math.round(p.aim * 100) / 100]);
     this.impulse(p, Math.cos(p.aim) * (w.lunge || 120), Math.sin(p.aim) * (w.lunge || 120));
@@ -630,18 +638,20 @@ export class Game {
         case 'turret': {
           o.cd -= dt;
           const owner = this.byId.get(o.owner);
-          let best = null, bd = 170 * 170;
+          const rng = o.big ? 210 : 170;
+          let best = null, bd = rng * rng;
           for (const t of this.players) {
             if (!t.alive || !this.hostile(o.team, o.owner, t)) continue;
             const d = dist2(o.x, o.y, t.x, t.y);
-            if (d < bd && !this.inSmoke(t) && lineOfSight(this.map, o.x, o.y, t.x, t.y)) { bd = d; best = t; }
+            if (d < bd && !this.inSmoke(t) && !this.hiddenFrom(t, o) && lineOfSight(this.map, o.x, o.y, t.x, t.y)) { bd = d; best = t; }
           }
           if (best) {
             const want = Math.atan2(best.y - o.y, best.x - o.x);
             o.aim += angDiff(o.aim, want) * Math.min(1, 12 * dt);
             if (o.cd <= 0 && Math.abs(angDiff(o.aim, want)) < 0.2 && owner && this.state === 'play') {
-              o.cd = 0.32;
-              this.spawnBullet(owner, { t: 'pea', dmg: 7, rad: 2 }, o.x + Math.cos(o.aim) * 7, o.y + Math.sin(o.aim) * 7, Math.cos(o.aim) * 300, Math.sin(o.aim) * 300, 0.6, { s: 's', i: 6 });
+              o.cd = o.big ? 0.17 : 0.32;
+              const sp = o.big ? 320 : 300;
+              this.spawnBullet(owner, { t: 'pea', dmg: o.big ? 8 : 7, rad: 2 }, o.x + Math.cos(o.aim) * 7, o.y + Math.sin(o.aim) * 7, Math.cos(o.aim) * sp, Math.sin(o.aim) * sp, o.big ? 0.68 : 0.6, o.big ? { s: 'u', i: 5 } : { s: 's', i: 6 });
               this.ev.push(['sfx', 'smg', o.x | 0, o.y | 0]);
             }
           }
@@ -685,14 +695,20 @@ export class Game {
         case 'strike': {
           o.t -= dt;
           if (o.t <= 0) {
-            const offs = [[0, 0], [-22, -10], [20, 12], [-6, 22], [10, -22]];
+            const offs = o.offs || [[0, 0], [-22, -10], [20, 12], [-6, 22], [10, -22]];
             const k = o.phase;
             if (k < offs.length) {
-              this.explode(o.x + offs[k][0], o.y + offs[k][1], k === 0 ? 40 : 28, k === 0 ? 60 : 32, this.byId.get(o.owner), { s: 's', i: 9 }, o.team);
-              o.phase++; o.t = 0.12;
+              this.explode(o.x + offs[k][0], o.y + offs[k][1], k === 0 ? (o.r0 || 40) : (o.r1 || 28), k === 0 ? (o.d0 || 60) : (o.d1 || 32), this.byId.get(o.owner), o.label || { s: 's', i: 9 }, o.team);
+              o.phase++; o.t = o.gap || 0.12;
             } else o.life = 0;
           }
           if (o.life === undefined) o.life = 5;
+          break;
+        }
+        case 'lob': {
+          o.t += dt; const k = Math.min(1, o.t / o.dur);
+          o.x = o.x0 + (o.tx - o.x0) * k; o.y = o.y0 + (o.ty - o.y0) * k; o.h = Math.sin(k * Math.PI) * 42;
+          if (k >= 1) { o.life = 0; this.explode(o.tx, o.ty, 46, 70, this.byId.get(o.owner), o.label, o.team); }
           break;
         }
         case 'food': case 'jelly': {
@@ -727,6 +743,107 @@ export class Game {
       }
     }
   }
+  // 수풀 은신: 수풀 안 + 최근 공격/피격 없음 + 관찰자와 거리 44 이상
+  hiddenFrom(t, viewer) {
+    if (!t.alive || t.k === 'decoy' || t.revealT > 0) return false;
+    if (viewer && this.mode === 'tdm' && viewer.team === t.team) return false;
+    if (!bushAt(this.map, t.x, t.y)) return false;
+    return !viewer || dist2(t.x, t.y, viewer.x, viewer.y) > 44 * 44;
+  }
+
+  // ── 궁극기 ──
+  doSuper(p) {
+    const su = SUPER[p.lo.u]; p.superCh = 0;
+    const ax = Math.cos(p.aim), ay = Math.sin(p.aim), label = { s: 'u', i: p.lo.u };
+    this.ev.push(['sup', p.id, p.lo.u, Math.round(p.aim * 1000) / 1000]);
+    const clipPoint = (dist) => {
+      const fr = raycast(this.map, p.x, p.y, p.x + ax * dist, p.y + ay * dist);
+      return { x: p.x + ax * dist * fr * 0.94, y: p.y + ay * dist * fr * 0.94 };
+    };
+    switch (su.id) {
+      case 'jbomb': { // 벽 너머로 던짐
+        let tx = p.x + ax * su.range, ty = p.y + ay * su.range;
+        tx = clamp(tx, TILE, this.map.pw - TILE); ty = clamp(ty, TILE, this.map.ph - TILE);
+        this.objs.push({ k: 'lob', id: this.nextId++, x0: p.x, y0: p.y, x: p.x, y: p.y, tx, ty, t: 0, dur: 0.65, h: 0, owner: p.id, team: p.team, label, life: 5 });
+        break;
+      }
+      case 'rush': p.rushT = 0.34; p.rushHits = []; this.impulse(p, ax * 460, ay * 460); p.invulnT = Math.max(p.invulnT, 0.2); break;
+      case 'barrage': this.barrageRing(p, 0); p.barrageT = 0.25; break;
+      case 'whirl': p.spinT = 1.8; p.spinTick = 0; break;
+      case 'blizzard': {
+        this.ev.push(['cone', p.x | 0, p.y | 0, Math.round(p.aim * 1000) / 1000, su.range]);
+        for (const t of this.targetList(p)) {
+          const dx = t.x - p.x, dy = t.y - p.y, d = Math.hypot(dx, dy);
+          if (d > su.range + t.r || (d > 8 && Math.abs(angDiff(p.aim, Math.atan2(dy, dx))) > 0.6)) continue;
+          if (!lineOfSight(this.map, p.x, p.y, t.x, t.y)) continue;
+          if (t.k === 'decoy') { this.popDecoy(t); continue; }
+          this.damage(t, 42 * this.dmgMul(p), p, label, dx / (d || 1), dy / (d || 1), 140);
+          if (t.alive) { t.chill = 0; t.frozenT = 1.4; }
+        }
+        break;
+      }
+      case 'fortress': {
+        let tx = p.x + ax * 14, ty = p.y + ay * 14; if (solidPx(this.map, tx, ty)) { tx = p.x; ty = p.y; }
+        this.objs.push({ k: 'turret', big: true, id: this.nextId++, x: tx, y: ty, life: 12, owner: p.id, team: p.team, cd: 0.3, aim: p.aim });
+        break;
+      }
+      case 'meteor': {
+        const c = clipPoint(su.range), offs = [[0, 0]];
+        for (let i = 0; i < 5; i++) { const a = rand(0, TAU), d = rand(14, 40); offs.push([Math.cos(a) * d, Math.sin(a) * d]); }
+        this.objs.push({ k: 'strike', meteor: true, id: this.nextId++, x: c.x, y: c.y, t: 0.9, owner: p.id, team: p.team, phase: 0, offs, gap: 0.2, r0: 34, d0: 50, r1: 30, d1: 40, label });
+        break;
+      }
+      case 'leap': {
+        let tx = p.x + ax * su.range, ty = p.y + ay * su.range;
+        for (let k = 0; k < 30 && (solidPx(this.map, tx, ty) || tx < TILE || ty < TILE || tx > this.map.pw - TILE || ty > this.map.ph - TILE); k++) { tx -= ax * 5; ty -= ay * 5; }
+        const probe = { x: tx, y: ty }; moveCircle(this.map, probe, 0, 0, p.r); tx = probe.x; ty = probe.y;
+        p.leapT = 0.5; p.leapX = tx; p.leapY = ty; p.invulnT = Math.max(p.invulnT, 0.6);
+        this.ev.push(['leap', p.id, p.x | 0, p.y | 0, tx | 0, ty | 0, 0.5]);
+        break;
+      }
+    }
+  }
+  barrageRing(p, off) {
+    for (let i = 0; i < 16; i++) {
+      const a = off + i / 16 * TAU;
+      this.spawnBullet(p, { t: 'pea', dmg: 13, rad: 2 }, p.x + Math.cos(a) * 6, p.y + Math.sin(a) * 6, Math.cos(a) * 230, Math.sin(a) * 230, 0.55, { s: 'u', i: 2 });
+    }
+    this.ev.push(['sfx', 'shotgun', p.x | 0, p.y | 0]);
+  }
+  updateSuperState(p, dt) {
+    const label = { s: 'u', i: p.lo.u };
+    if (p.barrageT > 0) { p.barrageT -= dt; if (p.barrageT <= 0) this.barrageRing(p, TAU / 32); }
+    if (p.rushT > 0) {
+      p.rushT -= dt;
+      for (const t of this.targetList(p)) {
+        if (p.rushHits.includes(t.id) || dist2(t.x, t.y, p.x, p.y) > (p.r + t.r + 6) ** 2) continue;
+        p.rushHits.push(t.id);
+        if (t.k === 'decoy') { this.popDecoy(t); continue; }
+        const d = Math.hypot(t.x - p.x, t.y - p.y) || 1;
+        this.damage(t, 52 * this.dmgMul(p), p, label, (t.x - p.x) / d, (t.y - p.y) / d, 330);
+        this.ev.push(['sfx', 'melee', t.x | 0, t.y | 0]);
+      }
+    }
+    if (p.spinT > 0) {
+      p.spinT -= dt; p.spinTick -= dt;
+      if (p.spinTick <= 0) {
+        p.spinTick = 0.2;
+        for (const t of this.targetList(p)) {
+          const d = Math.hypot(t.x - p.x, t.y - p.y); if (d > 30 + t.r) continue;
+          if (t.k === 'decoy') { this.popDecoy(t); continue; }
+          this.damage(t, 13 * this.dmgMul(p), p, label, (t.x - p.x) / (d || 1), (t.y - p.y) / (d || 1), 110);
+        }
+      }
+    }
+    if (p.leapT > 0) {
+      p.leapT -= dt;
+      if (p.leapT <= 0) {
+        p.leapT = 0; p.x = p.leapX; p.y = p.leapY; p.vx = p.vy = 0; p.warp++;
+        this.explode(p.x, p.y, 54, 72, p, label, p.team);
+      }
+    }
+  }
+
   smokeAt(x, y) { for (const o of this.objs) if (o.k === 'smoke' && dist2(o.x, o.y, x, y) < o.r * o.r) return o; return null; }
   inSmoke(t) { for (const o of this.objs) if (o.k === 'smoke' && dist2(o.x, o.y, t.x, t.y) < o.r * o.r) return true; return false; }
 
@@ -827,23 +944,24 @@ export class Game {
       let f = 0;
       if (p.alive) f |= 1; if (p.invulnT > 0) f |= 2; if (p.shieldT > 0) f |= 4; if (p.burnT > 0) f |= 8;
       if (p.frozenT > 0) f |= 16; if (p.tauntT > 0) f |= 32; if (p.reloadT > 0) f |= 64; if (p.healT > 0) f |= 128;
-      if (p.hurtT > 0) f |= 256; if (p.stunT > 0) f |= 512; if (p.slowT > 0) f |= 1024; if (p.giantT > 0) f |= 2048; if (p.slipT > 0) f |= 4096; if (p.chargeT > 0) f |= 8192;
+      if (p.hurtT > 0) f |= 256; if (p.stunT > 0) f |= 512; if (p.slowT > 0) f |= 1024; if (p.giantT > 0) f |= 2048; if (p.slipT > 0) f |= 4096; if (p.chargeT > 0) f |= 8192; if (p.revealT > 0) f |= 16384; if (p.spinT > 0) f |= 32768; if (p.leapT > 0) f |= 65536;
       const w = PRIMARY[p.lo.p];
       return [p.id, Math.round(p.x * 10) / 10, Math.round(p.y * 10) / 10, Math.round(p.aim * 100) / 100, Math.ceil(p.hp), p.maxHp, f, p.warp,
         p.lo.p, p.lo.m, p.lo.s, p.lo.t, p.ammo, p.reloadT > 0 ? Math.round((1 - p.reloadT / w.reload) * 100) : 100,
         Math.round(p.skillCd * 10) / 10, Math.round(p.meleeCd * 100) / 100, Math.round(Math.max(0, p.respawnT) * 10) / 10, p.chill,
         Math.round(p.slowT * 10) / 10, Math.round(p.frozenT * 10) / 10, Math.round(p.stunT * 10) / 10, Math.round(p.tauntT * 10) / 10,
-        Math.round(p.giantT * 10) / 10, Math.round(p.slipT * 10) / 10, p.killedBy ?? -1, Math.round(p.tauntCd * 10) / 10];
+        Math.round(p.giantT * 10) / 10, Math.round(p.slipT * 10) / 10, p.killedBy ?? -1, Math.round(p.tauntCd * 10) / 10, p.lo.u, Math.round(p.superCh * 100)];
     });
     const os = [];
     for (const o of this.objs) {
       switch (o.k) {
         case 'smoke': os.push([1, o.id, o.x | 0, o.y | 0, o.r, Math.round(o.life * 10) / 10, o.owner]); break;
         case 'banana': os.push([2, o.id, o.x | 0, o.y | 0, o.team, 0, o.owner]); break;
-        case 'turret': os.push([3, o.id, o.x | 0, o.y | 0, Math.round(o.aim * 100) / 100, Math.round(o.life * 10) / 10, o.owner]); break;
+        case 'turret': os.push([o.big ? 12 : 3, o.id, o.x | 0, o.y | 0, Math.round(o.aim * 100) / 100, Math.round(o.life * 10) / 10, o.owner]); break;
+        case 'lob': os.push([11, o.id, o.x | 0, o.y | 0, o.h | 0, 0, o.owner]); break;
         case 'decoy': os.push([4, o.id, Math.round(o.x), Math.round(o.y), Math.round(o.aim * 100) / 100, o.r, o.owner]); break;
         case 'vortex': os.push([5, o.id, o.x | 0, o.y | 0, Math.round(o.life * 10) / 10, 0, o.owner]); break;
-        case 'strike': os.push([6, o.id, o.x | 0, o.y | 0, Math.round(o.t * 10) / 10, o.phase, o.owner]); break;
+        case 'strike': os.push([o.meteor ? 13 : 6, o.id, o.x | 0, o.y | 0, Math.round(o.t * 10) / 10, o.phase, o.owner]); break;
         case 'food': os.push([7, o.id, o.x | 0, o.y | 0, o.ft, 0, -1]); break;
         case 'jelly': os.push([8, o.id, o.x | 0, o.y | 0, Math.round(o.life), 0, -1]); break;
         case 'drop': os.push([9, o.id, o.x | 0, o.y | 0, Math.round(o.t * 10) / 10, 0, -1]); break;

@@ -25,11 +25,11 @@ export class Hud {
     this.slotsEl = $('slots');
     this.slotEls = SLOTS.map((s, i) => {
       const d = document.createElement('div'); d.className = 'slot';
-      d.innerHTML = `<img alt=""><span class="cd"></span><span class="cdn"></span><span class="key">${['좌클', 'Q', 'E', 'F'][i]}</span><span class="amt"></span>${i === 0 ? '<span class="rl"></span>' : ''}`;
+      d.innerHTML = `<img alt=""><span class="cd"></span><span class="cdn"></span><span class="key">${{ p: '좌클', m: 'Q', s: 'E', u: 'Space', t: 'F' }[s.key]}</span><span class="amt"></span>${i === 0 ? '<span class="rl"></span>' : ''}`;
       this.slotsEl.appendChild(d);
       return { d, img: d.querySelector('img'), cd: d.querySelector('.cd'), cdn: d.querySelector('.cdn'), amt: d.querySelector('.amt'), rl: d.querySelector('.rl') };
     });
-    this.tb = { p: $('tFire'), m: $('tMelee'), s: $('tSkill'), t: $('tTaunt') };
+    this.tb = { p: $('tFire'), m: $('tMelee'), s: $('tSkill'), t: $('tTaunt'), u: $('tSuper') };
     this.mm = $('minimap'); this.mmx = this.mm.getContext('2d'); this.mmBase = null; this.mmT = 0;
     this.reels = []; this.rouActive = false; this.lastLo = '';
     this.annQ = []; this.feed = [];
@@ -85,7 +85,7 @@ export class Hud {
     setStyle($('hpFill'), 'background', hpF > 0.6 ? 'linear-gradient(#7af59a,#3fbf63)' : hpF > 0.3 ? 'linear-gradient(#ffe37a,#e0b020)' : 'linear-gradient(#ff8a95,#d8344a)');
     setText($('hpText'), me.alive ? `${Math.ceil(me.hp)} / ${me.maxHp}` : '부활 대기');
     // 장비 슬롯
-    const lo = me.lo, loKey = lo.p + ',' + lo.m + ',' + lo.s + ',' + lo.t;
+    const lo = me.lo, loKey = lo.p + ',' + lo.m + ',' + lo.s + ',' + lo.t + ',' + lo.u;
     if (loKey !== this.lastLo) {
       this.lastLo = loKey;
       SLOTS.forEach((s, i) => {
@@ -103,8 +103,15 @@ export class Hud {
     setStyle(this.slotEls[0].rl, 'background', reloading ? '#ffd23f' : '#fff');
     const mcd = MELEE[lo.m].cd, scd = S.settings.mode === 'range' ? 1 : SKILL[lo.s].cd;
     const mF = Math.min(1, (me.meleeCd || 0) / mcd), sF = Math.min(1, (me.skillCd || 0) / scd), tF = Math.min(1, (me.tauntCd || 0) / 3.5);
-    setStyle(this.slotEls[1].cd, '--cd', mF.toFixed(2)); setStyle(this.slotEls[2].cd, '--cd', sF.toFixed(2)); setStyle(this.slotEls[3].cd, '--cd', tF.toFixed(2));
+    setStyle(this.slotEls[1].cd, '--cd', mF.toFixed(2)); setStyle(this.slotEls[2].cd, '--cd', sF.toFixed(2));
     setText(this.slotEls[2].cdn, me.skillCd > 0.05 ? String(Math.ceil(me.skillCd)) : '');
+    const uI = SLOTS.findIndex((x) => x.key === 'u'), tI = SLOTS.findIndex((x) => x.key === 't');
+    const sc = Math.min(1, me.superCh || 0), ready = sc >= 1;
+    setStyle(this.slotEls[uI].cd, '--cd', (1 - sc).toFixed(2)); setStyle(this.slotEls[tI].cd, '--cd', tF.toFixed(2));
+    this.slotEls[uI].d.classList.toggle('ready', ready);
+    setText(this.slotEls[uI].cdn, ready ? '' : Math.floor(sc * 100) + '%');
+    if (mobile) { setStyle(this.tb.u.querySelector('.cd'), '--cd', (1 - sc).toFixed(2)); this.tb.u.classList.toggle('ready', ready); }
+    if (ready && !this._wasReady) { this.el.classList.add('superReady'); } this._wasReady = ready;
     if (mobile) {
       setText(this.tb.p.querySelector('.amt'), ammoTxt);
       setStyle(this.tb.p.querySelector('.cd'), '--cd', reloading ? (1 - rp).toFixed(2) : '0');
@@ -189,7 +196,7 @@ export class Hud {
       const d = document.createElement('div'); d.className = 'reel';
       d.innerHTML = `<div class="lab">${s.name}</div><div class="win spin"><img alt=""></div><div class="nm">&nbsp;</div><div class="rr"></div>`;
       box.appendChild(d);
-      return { d, win: d.querySelector('.win'), img: d.querySelector('img'), nm: d.querySelector('.nm'), rr: d.querySelector('.rr'), list: s.list, final: it, stopAt: 0.75 + i * 0.6, done: false, next: 0 };
+      return { d, win: d.querySelector('.win'), img: d.querySelector('img'), nm: d.querySelector('.nm'), rr: d.querySelector('.rr'), list: s.list, final: it, stopAt: 0.6 + i * 0.48, done: false, next: 0 };
     });
     R.classList.remove('hidden');
     this.rouT = 0; this.rouActive = true; this.rouDone = onDone; this.rouHold = 0;

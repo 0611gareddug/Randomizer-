@@ -1,5 +1,5 @@
 // 테마 맵 3종 + 충돌/시야 판정
-// 타일: 0 바닥, 1 벽, 2 장애물, 3 얼음, 4 벨트→, 5 벨트←, 6 벨트↑, 7 벨트↓
+// 타일: 0 바닥, 1 벽, 2 장애물, 3 얼음, 4 벨트→, 5 벨트←, 6 벨트↑, 7 벨트↓, 8 수풀
 export const TILE = 16;
 
 // 4분면 정의 → 좌우/상하 대칭으로 확장
@@ -75,6 +75,12 @@ const STORE_L = [
   '########################',
 ];
 
+// 수풀 배치: [x, y, w, h] 영역의 바닥('.')만 수풀('b')로
+function bushes(rows, rects) {
+  const g = rows.map((r) => r.split(''));
+  for (const [x, y, w, h] of rects) for (let j = y; j < y + h; j++) for (let i = x; i < x + w; i++) if (g[j] && g[j][i] === '.') g[j][i] = 'b';
+  return g.map((r) => r.join(''));
+}
 function mirrorH(rows) { return rows.map((r) => r + r.split('').reverse().join('')); }
 function mirrorV(rows) {
   const sw = { '>': '<', '<': '>', '^': 'v', 'v': '^' };
@@ -83,9 +89,9 @@ function mirrorV(rows) {
 }
 
 const DEFS = [
-  { id: 'factory', name: '폐공장', desc: '컨베이어 벨트가 돌아가는 버려진 공장', theme: 'factory', rows: mirrorV(mirrorH(FACTORY_Q)) },
-  { id: 'store', name: '24시 편의점', desc: '좁은 진열대 사이의 근접전', theme: 'store', rows: mirrorH(STORE_L) },
-  { id: 'snow', name: '눈 덮인 마을', desc: '미끄러운 얼음 연못이 있는 겨울 마을', theme: 'snow', rows: mirrorV(mirrorH(SNOW_Q)) },
+  { id: 'factory', name: '폐공장', desc: '컨베이어 벨트가 돌아가는 버려진 공장', theme: 'factory', rows: mirrorV(mirrorH(bushes(FACTORY_Q, [[9, 1, 4, 2], [1, 10, 3, 3], [14, 8, 4, 2], [18, 13, 4, 2], [5, 4, 2, 2]]))) },
+  { id: 'store', name: '24시 편의점', desc: '좁은 진열대 사이의 근접전', theme: 'store', rows: mirrorH(bushes(STORE_L, [[19, 1, 4, 1], [5, 15, 4, 2], [2, 22, 5, 1], [20, 18, 3, 3], [19, 10, 4, 3], [2, 26, 5, 2]])) },
+  { id: 'snow', name: '눈 덮인 마을', desc: '미끄러운 얼음 연못이 있는 겨울 마을', theme: 'snow', rows: mirrorV(mirrorH(bushes(SNOW_Q, [[6, 1, 4, 2], [15, 3, 3, 3], [5, 10, 4, 2], [19, 8, 3, 2], [1, 6, 2, 3]]))) },
 ];
 export const MAP_LIST = DEFS.map((d) => ({ id: d.id, name: d.name, desc: d.desc }));
 
@@ -100,7 +106,7 @@ export function getMap(id) {
     const c = rows[j][i] || '#';
     let t = 0;
     if (c === '#') t = 1; else if (c === 'X' || c === 'T') t = 2; else if (c === 'i') t = 3;
-    else if (c === '>') t = 4; else if (c === '<') t = 5; else if (c === '^') t = 6; else if (c === 'v') t = 7;
+    else if (c === 'b') t = 8; else if (c === '>') t = 4; else if (c === '<') t = 5; else if (c === '^') t = 6; else if (c === 'v') t = 7;
     else if (c === 'S') spawns.push({ x: (i + 0.5) * TILE, y: (j + 0.5) * TILE });
     else if (c === 'H') heals.push({ x: (i + 0.5) * TILE, y: (j + 0.5) * TILE });
     if (i === 0 || j === 0 || i === w - 1 || j === h - 1) t = 1;
@@ -108,7 +114,8 @@ export function getMap(id) {
   }
   const floors = [];
   for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) { const t = grid[j * w + i]; if (t !== 1 && t !== 2) floors.push(j * w + i); }
-  const m = { id: d.id, name: d.name, theme: d.theme, w, h, tile: TILE, grid, spawns, heals, floors, pw: w * TILE, ph: h * TILE, seed: d.id.length * 977 };
+  const bushCount = grid.reduce((n, t) => n + (t === 8 ? 1 : 0), 0);
+  const m = { id: d.id, name: d.name, theme: d.theme, w, h, tile: TILE, grid, spawns, heals, floors, bushCount, pw: w * TILE, ph: h * TILE, seed: d.id.length * 977 };
   built.set(id, m);
   return m;
 }
@@ -124,6 +131,7 @@ export function tileAtPx(map, x, y) {
   return map.grid[ty * map.w + tx];
 }
 export function solidPx(map, x, y) { const t = tileAtPx(map, x, y); return t === 1 || t === 2; }
+export function bushAt(map, x, y) { return tileAtPx(map, x, y) === 8; }
 
 // 원 vs 타일 충돌 해소 (축 분리)
 export function moveCircle(map, o, dx, dy, r) {

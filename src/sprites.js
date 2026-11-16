@@ -51,6 +51,15 @@ const ICONS = {
   wave: ['............', '............', '..kk....kk..', '.kcck..kcck.', 'kcwcck.kccck', 'kccccckccck.', '.kccccccck..', '..kkccckk...', '....kkk.....', '............', '............', '............'],
   spin: ['............', '...kkkkkk...', '..kooooook..', '.kok....kok.', '.kok.kk.kok.', '.kok.kok.ok.', '.kok.koo.ok.', '.kok..kkok..', '..kooooook..', '...kkkkkk...', '............', '............'],
   tongue: ['............', '...kkkkkk...', '..kyyyyyyk..', '.kyykyykyyk.', '.kyyyyyyyyk.', '.kykkkkkkyk.', '.kyyyrryyyk.', '..kyyrryyk..', '...kkkkkk...', '............', '............', '............'],
+  // 궁극기
+  jbomb: ['............', '......kk....', '.....kyk....', '....kok.....', '...kkkkk....', '..kGGGGGk...', '.kGwlGGGGk..', '.kGlGGGGGk..', '.kGGGGGGGk..', '.kGGGGGGGk..', '..kGGGGGk...', '...kkkkk....'],
+  rush: ['............', '..kk...kkk..', '.kook.kGGGk.', '..kk.kGwGGGk', 'kk...kGGkGGk', 'kook.kGGGGGk', '.kk..kGGkGGk', '..kk.kGGGGGk', '.kook.kGGGk.', '..kk...kkk..', '............', '............'],
+  barrage: ['.....kk.....', '..k..kk..k..', '..kk.yy.kk..', '...kyyyyk...', '.kkyywwyykk.', 'kyyywwwwyyyk', 'kyyywwwwyyyk', '.kkyywwyykk.', '...kyyyyk...', '..kk.yy.kk..', '..k..kk..k..', '.....kk.....'],
+  whirl: ['............', '...kkkkkk...', '..kccccCCk..', '.kck....kCk.', '.kc..kkk.kk.', '.kc.kcck....', '.kc.kc.ck...', '.kCk..kck...', '..kCCcck....', '...kkkk.....', '............', '............'],
+  blizzard: ['.....kk.....', '..k.kCCk.k..', '.kCkkwwkkCk.', '..kCCwwCCk..', '.kkkCwwCkkk.', 'kCwwwwwwwwCk', 'kCwwwwwwwwCk', '.kkkCwwCkkk.', '..kCCwwCCk..', '.kCkkwwkkCk.', '..k.kCCk.k..', '.....kk.....'],
+  fortress: ['....kkkk....', '...kyyyyk...', '...kgggkkkkk', '..kggrggsssk', '..kgggggkkkk', '..kkddddk...', '.kddddddddk.', '.kdgdddgddk.', 'kddddddddddk', 'kkkkkkkkkkkk', '............', '............'],
+  meteor: ['k...........', '.k.k........', '..kok.......', '.kooyk......', '..kyyyk.....', '...kyyok.kk.', '....kooookok', '......kookyk', '.....kyyyyk.', '.....kywyyk.', '......kyyk..', '.......kk...'],
+  leap: ['.....kk.....', '....kook....', '...kooook...', '....kook....', '...kkkkkk...', '..kGGGGGGk..', '.kGwkGGkGGk.', '.kGGGGGGGGk.', '..kkkkkkkk..', '............', 'k.kk.kk.kk.k', '.k..k..k..k.'],
   // 월드 오브젝트
   pizza: ['............', '.kkkkkkkkkk.', '.kBBBBBBBBk.', '..kyyryyyk..', '..kyyyyryk..', '...kyryyk...', '...kyyyyk...', '....kyrk....', '....kyyk....', '.....kk.....', '............', '............'],
   milk: ['....kkkk....', '...kwwwwk...', '...kkkkkk...', '..kwwwwwwk..', '..kwccccwk..', '..kwcwwcwk..', '..kwccccwk..', '..kwwwwwwk..', '..kwwwwwwk..', '..kkkkkkkk..', '............', '............'],
@@ -258,6 +267,34 @@ export function renderMapCanvas(map) {
       if (j + 1 >= H || below === 1) { x.fillStyle = th.wallTop; x.fillRect(px, py + T - 5, T, 5); }
       else { x.fillStyle = 'rgba(0,0,0,0.25)'; x.fillRect(px, py + T, T, 3); }
     } else drawObstacle(x, map.theme, px, py, T, rnd, map, i, j);
+  }
+  return c;
+}
+
+// 수풀 레이어 (캐릭터 위에 덮어 그림)
+export function renderBushCanvas(map) {
+  const T = map.tile, c = document.createElement('canvas'); c.width = map.w * T; c.height = map.h * T;
+  const x = c.getContext('2d'), rnd = seeded((map.seed || 7) + 99);
+  const pal = map.theme === 'snow' ? ['#1a1530', '#2f7d4a', '#3f9a5c', '#6cc27e', '#ffffff'] : map.theme === 'store' ? ['#1a1530', '#2e8a4a', '#3fb060', '#7ad98a', '#c8f7c5'] : ['#1a1530', '#2b5f2e', '#3f7f3a', '#66a84f', '#9fd36a'];
+  const isB = (i, j) => i >= 0 && j >= 0 && i < map.w && j < map.h && map.grid[j * map.w + i] === 8;
+  const blob = (cx, cy, r, col) => { x.fillStyle = col; for (let yy = -r; yy <= r; yy++) { const w = Math.round(Math.sqrt(r * r - yy * yy)); x.fillRect(cx - w, cy + yy, w * 2 + 1, 1); } };
+  for (let pass = 0; pass < 4; pass++) for (let j = 0; j < map.h; j++) for (let i = 0; i < map.w; i++) {
+    if (!isB(i, j)) continue;
+    const px = i * T, py = j * T;
+    const pts = [[4, 5], [12, 5], [4, 12], [12, 12], [8, 8]];
+    for (const [ox, oy] of pts) {
+      const r = 5 + ((rnd() * 2) | 0);
+      if (pass === 0) blob(px + ox, py + oy, r + 1, pal[0]);
+      else if (pass === 1) blob(px + ox, py + oy, r, pal[1]);
+      else if (pass === 2) blob(px + ox - 1, py + oy - 1, r - 2, pal[2]);
+      else { x.fillStyle = pal[3]; x.fillRect(px + ox - 2, py + oy - 3, 2, 1); x.fillRect(px + ox + 1, py + oy - 1, 1, 1); }
+    }
+    if (pass === 3) {
+      x.fillStyle = pal[4];
+      if (map.theme === 'snow') { x.fillRect(px + 2, py, 6, 2); x.fillRect(px + 9, py + 1, 5, 2); }
+      else for (let k = 0; k < 3; k++) x.fillRect(px + 2 + ((rnd() * 12) | 0), py + 2 + ((rnd() * 12) | 0), 1, 1);
+      if (!isB(i, j + 1)) { x.fillStyle = 'rgba(0,0,0,0.25)'; x.fillRect(px, py + T, T, 2); }
+    }
   }
   return c;
 }

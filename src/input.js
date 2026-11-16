@@ -7,13 +7,14 @@ export const input = {
   mx: 0, my: 0,             // 이동 벡터
   mouseX: 0, mouseY: 0,     // 화면 좌표 (CSS px)
   fire: false,
-  fireN: 0, meleeN: 0, skillN: 0, tauntN: 0, reloadN: 0,
+  fireN: 0, meleeN: 0, skillN: 0, tauntN: 0, reloadN: 0, superN: 0,
   usedMouse: false,
   enabled: false,
   stick: { active: false, id: -1, ox: 0, oy: 0, x: 0, y: 0 },
   touchFire: false,
   atk: { active: false, aiming: false, ang: 0, id: -1 },
   skl: { active: false, aiming: false, ang: 0, id: -1 },
+  sup: { active: false, aiming: false, ang: 0, id: -1 },
   aimHold: null, tapFireUntil: 0,
   onKey: null,              // 메뉴용 키 콜백
 };
@@ -39,7 +40,8 @@ export function initInput(canvas) {
     if (e.repeat) return;
     switch (e.code) {
       case 'KeyQ': input.meleeN++; break;
-      case 'KeyE': case 'Space': input.skillN++; e.preventDefault(); break;
+      case 'KeyE': input.skillN++; break;
+      case 'Space': input.superN++; e.preventDefault(); break;
       case 'KeyF': input.tauntN++; break;
       case 'KeyR': input.reloadN++; break;
     }
@@ -117,6 +119,7 @@ export function initTouch(root) {
   };
   aimStick(root.querySelector('#tFire'), input.atk, () => { input.fireN++; input.tapFireUntil = performance.now() + 320; }, () => { input.fireN++; });
   aimStick(root.querySelector('#tSkill'), input.skl, () => { input.skillN++; }, () => { input.skillN++; });
+  aimStick(root.querySelector('#tSuper'), input.sup, () => { input.superN++; }, () => { input.superN++; });
 
   const bind = (sel, down) => {
     const el = root.querySelector(sel); if (!el) return;

@@ -79,6 +79,18 @@ export const TAUNT = [
   { id: 'tongue', name: '메롱', r: 3, desc: '최고 등급의 놀림.', emote: '메롱' },
 ];
 
+// ── 궁극기 8종 ── 적을 맞히면 게이지 충전, 리스폰 룰렛으로 랜덤 지급
+export const SUPER = [
+  { id: 'jbomb', name: '젤리 폭탄', r: 0, desc: '벽 너머로 젤리 폭탄을 던진다. 넓게 터진다.', range: 130 },
+  { id: 'rush', name: '말랑 돌진', r: 0, desc: '앞으로 힘차게 돌진해 부딪힌 적을 날려버린다.', range: 120 },
+  { id: 'barrage', name: '콩알 대난사', r: 1, desc: '사방으로 콩알을 두 번 흩뿌린다.', range: 90 },
+  { id: 'whirl', name: '회오리 회전', r: 1, desc: '빙글빙글 돌며 주변 적을 계속 때린다. 이동도 빨라진다.', range: 40 },
+  { id: 'blizzard', name: '눈보라', r: 2, desc: '앞쪽 부채꼴에 눈보라를 뿜어 적을 얼린다.', range: 105 },
+  { id: 'fortress', name: '요새 포탑', r: 2, desc: '오래 버티며 빠르게 쏘는 큰 포탑을 설치한다.', range: 20 },
+  { id: 'meteor', name: '별똥별 소나기', r: 3, desc: '조준한 곳에 별똥별 여섯 개가 쏟아진다.', range: 160 },
+  { id: 'leap', name: '슈퍼 점프', r: 3, desc: '높이 뛰어올라 착지 지점에 충격파를 일으킨다.', range: 125 },
+];
+
 // ── 템포 조정: 탄속·연사·쿨다운을 전체적으로 느긋하게 ──
 for (const w of PRIMARY) { w.rate *= 0.8; w.reload *= 1.12; if (w.b.spd) { w.b.spd *= 0.78; w.b.life /= 0.78 * 1.04; } }
 for (const m of MELEE) m.cd *= 1.15;
@@ -110,6 +122,7 @@ export const SLOTS = [
   { key: 'p', name: '주무기', list: PRIMARY },
   { key: 'm', name: '근접', list: MELEE },
   { key: 's', name: '스킬', list: SKILL },
+  { key: 'u', name: '궁극기', list: SUPER },
   { key: 't', name: '도발', list: TAUNT },
 ];
 

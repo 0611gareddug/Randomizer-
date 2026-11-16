@@ -240,11 +240,12 @@ table.sb .red td:first-child { box-shadow: inset 4px 0 0 #ff5d73; } table.sb .bl
 .tb img { width: 58%; height: 58%; position: relative; z-index: 1; }
 .tb .cd { position: absolute; inset: 0; background: conic-gradient(rgba(10,8,20,.75) calc(var(--cd, 0) * 1turn), transparent 0); z-index: 2; }
 .tb .lbl { position: absolute; bottom: 8%; font-size: calc(10px * var(--btn)); z-index: 3; text-shadow: 0 1px 0 #000; }
-#tFire { width: calc(124px * var(--btn)); height: calc(124px * var(--btn)); right: calc(26px * var(--btn)); bottom: calc(24px * var(--btn)); }
-#tSkill { width: calc(86px * var(--btn)); height: calc(86px * var(--btn)); right: calc(168px * var(--btn)); bottom: calc(120px * var(--btn)); }
-#tMelee { width: calc(66px * var(--btn)); height: calc(66px * var(--btn)); right: calc(170px * var(--btn)); bottom: calc(26px * var(--btn)); }
-#tTaunt { width: calc(50px * var(--btn)); height: calc(50px * var(--btn)); right: calc(44px * var(--btn)); bottom: calc(166px * var(--btn)); }
-#tReload { width: calc(44px * var(--btn)); height: calc(44px * var(--btn)); right: calc(254px * var(--btn)); bottom: calc(30px * var(--btn)); font-size: calc(16px * var(--btn)); color: #fff; }
+#tFire { width: calc(122px * var(--btn)); height: calc(122px * var(--btn)); right: calc(22px * var(--btn)); bottom: calc(20px * var(--btn)); }
+#tSkill { width: calc(64px * var(--btn)); height: calc(64px * var(--btn)); right: calc(44px * var(--btn)); bottom: calc(158px * var(--btn)); }
+#tSuper { width: calc(88px * var(--btn)); height: calc(88px * var(--btn)); right: calc(152px * var(--btn)); bottom: calc(96px * var(--btn)); }
+#tMelee { width: calc(60px * var(--btn)); height: calc(60px * var(--btn)); right: calc(160px * var(--btn)); bottom: calc(14px * var(--btn)); }
+#tTaunt { width: calc(46px * var(--btn)); height: calc(46px * var(--btn)); right: calc(128px * var(--btn)); bottom: calc(196px * var(--btn)); }
+#tReload { width: calc(42px * var(--btn)); height: calc(42px * var(--btn)); right: calc(232px * var(--btn)); bottom: calc(18px * var(--btn)); font-size: calc(16px * var(--btn)); color: #fff; }
 body.mobile .bottom { left: auto; right: auto; bottom: auto; top: calc(10px * var(--u)); left: calc(170px * var(--u)); transform: none; align-items: flex-start; }
 body.mobile .slots { display: none; }
 body.mobile .hpBar { width: calc(170px * var(--u)); height: calc(16px * var(--u)); }
@@ -252,9 +253,10 @@ body.mobile #chatLog { bottom: auto; top: calc(130px * var(--u)); width: min(280
 body.mobile #chatInputWrap { bottom: auto; top: calc(40%); left: 50%; transform: translateX(-50%); }
 body.mobile .hudBtns { top: auto; bottom: auto; top: calc(10px * var(--u)); }
 body.mobile #killfeed { top: calc(56px * var(--u)); }
-body.mobile #roulette .reel { width: calc(80px * var(--u)); } body.mobile #roulette .reel .win { width: calc(64px * var(--u)); height: calc(64px * var(--u)); }
+body.mobile #roulette { top: 44%; padding: 8px 12px 10px; } body.mobile #roulette .reels { gap: 8px; } body.mobile #roulette .reel { width: calc(70px * var(--u)); } body.mobile #roulette .reel .win { width: calc(54px * var(--u)); height: calc(54px * var(--u)); } body.mobile #roulette .reel .nm { font-size: calc(11px * var(--u)); }
 body.mobile #roulette { top: 50%; }
-body.mobile #rangePanel { top: calc(56px * var(--u)); width: calc(220px * var(--u)); bottom: calc(180px * var(--u)); }
+body.mobile #rangePanel { top: calc(92px * var(--u)); left: 24%; right: 24%; width: auto; bottom: auto; max-height: 42vh; z-index: 5; padding: 6px; }
+body.mobile #rangePanel .grid { grid-template-columns: repeat(8, 1fr); max-height: 26vh; } body.mobile #rangePanel .tabs { margin-bottom: 4px; gap: 4px; }
 
 #fsBtn { position: fixed; right: calc(10px * var(--u)); bottom: calc(10px * var(--u)); pointer-events: auto; z-index: 50; }
 body.mobile.ingame #fsBtn { bottom: auto; top: calc(10px * var(--u)); right: calc(150px * var(--u)); }
@@ -279,3 +281,15 @@ body:not(.mobile).ingame #fsBtn { display: none; }
 @media (max-width: 640px) and (orientation: landscape), (max-width: 560px) {
   .lobbyGrid { grid-template-columns: 1fr; }
 }
+
+/* 궁극기 */
+.aimStick.su { background: rgba(120,100,40,.45); }
+.aimStick.su .cd { background: conic-gradient(rgba(10,8,20,.72) calc(var(--cd, 1) * 1turn), transparent 0); }
+.aimStick.su.ready { background: rgba(255,200,40,.55); box-shadow: 0 0 0 3px rgba(11,9,24,.9), 0 0 18px #ffd23f, 0 0 36px rgba(255,160,0,.6); animation: supPulse .8s ease-in-out infinite; }
+.aimStick.su.down { background: rgba(255,210,63,.6); }
+@keyframes supPulse { 50% { transform: scale(1.06); } }
+.slot.ready { box-shadow: 0 0 0 3px var(--line), inset 0 0 0 3px #ffd23f, 0 0 16px #ffd23f; animation: supPulse .8s ease-in-out infinite; }
+.slot .cdn { font-size: calc(12px * var(--u)); }
+/* 체력·탄약은 캐릭터 머리 위로 이동 */
+.hpWrap { display: none !important; }
+.slot { width: calc(56px * var(--u)); height: calc(56px * var(--u)); }

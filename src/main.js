@@ -7,7 +7,7 @@ import { Hud, slimeURL, itemOf } from './hud.js';
 import { Presenter, OfflineSession, HostSession, ClientSession, smokeAt } from './game.js';
 import { errText } from './net.js';
 import { getMap, MAP_LIST, lineOfSight } from './maps.js';
-import { PRIMARY, MELEE, SKILL, TAUNT, SLOTS, RARITY, SLIME_COLORS, FACES, HATS, QUICK_CHAT } from './data.js';
+import { PRIMARY, MELEE, SKILL, TAUNT, SUPER, SLOTS, RARITY, SLIME_COLORS, FACES, HATS, QUICK_CHAT } from './data.js';
 import { slimeSprite, drawFace, drawHat, iconURL } from './sprites.js';
 import { store, escapeHtml, isTouch, clamp, dist2 } from './util.js';
 
@@ -24,7 +24,7 @@ R.mobile = mobile;
 // ── 저장 데이터 ──
 const profile = store.get('profile', null) || { name: '슬라임' + ((Math.random() * 9000 + 1000) | 0), color: SLIME_COLORS[(Math.random() * SLIME_COLORS.length) | 0], face: 0, hat: 0 };
 const settings = Object.assign({ sfx: 70, music: 45, shake: true, dmgNum: true, lowSpec: false, fps: false, btnSize: 1, uiSize: 1, aimAssist: true }, store.get('settings', {}));
-const codex = Object.assign({ p: [], m: [], s: [], t: [] }, store.get('codex', {}));
+const codex = Object.assign({ p: [], m: [], s: [], t: [], u: [] }, store.get('codex', {}));
 const stats = Object.assign({ matches: 0, wins: 0, kills: 0, deaths: 0, dmg: 0, best: 0, legend: 0, loots: 0, wk: {} }, store.get('stats', {}));
 let offlineCfg = Object.assign({ mode: 'dm', mapId: 'random', bots: 5, botDiff: 1, timeLimit: 300, killLimit: 20 }, store.get('offlineCfg', {}));
 const saveProfile = () => store.set('profile', profile);
@@ -264,7 +264,7 @@ function beginMatch(sess) {
   wasAlive = false; lastCount = -1; camSnap = true;
   playMusic(Math.random() < 0.5 ? 'battle' : 'battle2');
   if (sess.settings.mode === 'range') buildRangePanel(); else $('rangePanel').classList.add('hidden');
-  ['p', 'm', 's', 't'].forEach((k) => { const me = W.byId.get(sess.myId); if (me && sess.settings.mode === 'range') codexAdd(k, me.lo[k]); });
+  ['p', 'm', 's', 'u', 't'].forEach((k) => { const me = W.byId.get(sess.myId); if (me && sess.settings.mode === 'range') codexAdd(k, me.lo[k]); });
 }
 function endMatchUI() {
   inMatch = false; input.enabled = false; clearInput();
@@ -378,6 +378,7 @@ function renderCodex() {
     if (codexTab === 'p') { const b = it.b; st = `<span>피해 ${b.dmg || '폭발'}${b.count ? ' ×' + b.count : ''}</span><span>연사 ${it.rate.toFixed(1)}/초</span><span>탄창 ${it.mag}</span><span>재장전 ${it.reload.toFixed(1)}초</span>${b.boom ? `<span>폭발 ${b.boom}</span>` : ''}${b.charge ? `<span>조준 예고 ${b.charge}초</span>` : ''}`; }
     else if (codexTab === 'm') st = `<span>피해 ${it.dmg}</span><span>쿨다운 ${it.cd.toFixed(2)}초</span><span>사거리 ${it.range}</span><span>넉백 ${it.knock}</span>`;
     else if (codexTab === 's') st = `<span>쿨다운 ${it.cd}초</span>`;
+    else if (codexTab === 'u') st = `<span>적에게 피해 ${210}을 주면 충전</span><span>사거리 ${it.range}</span>`;
     else st = `<span>끝까지 추면 체력 +10</span>`;
   }
   const kills = stats.wk[codexTab + codexSel] || 0;
@@ -415,6 +416,7 @@ function computeAim(W, me) {
   if (mobile) {
     if (input.atk.aiming) return input.atk.ang;
     if (input.skl.aiming) return input.skl.ang;
+    if (input.sup.aiming) return input.sup.ang;
     if (input.aimHold && performance.now() < input.aimHold.until) return input.aimHold.ang;
   }
   if (!mobile && input.usedMouse) {
@@ -453,7 +455,7 @@ function frame(now) {
     const act = input.enabled && !paused;
     const autoW = me && PRIMARY[me.lo.p].auto;
     const touchFire = mobile && ((input.atk.aiming && autoW) || now < input.tapFireUntil);
-    S.setInput({ mx: act ? input.mx : 0, my: act ? input.my : 0, aim, fire: act && (input.fire || touchFire), fireN: input.fireN, meleeN: input.meleeN, skillN: input.skillN, tauntN: input.tauntN, reloadN: input.reloadN });
+    S.setInput({ mx: act ? input.mx : 0, my: act ? input.my : 0, aim, fire: act && (input.fire || touchFire), fireN: input.fireN, meleeN: input.meleeN, skillN: input.skillN, tauntN: input.tauntN, reloadN: input.reloadN, superN: input.superN });
     if (!paused) S.tick(dt, presenter);
     if (!inMatch || !S || !S.world) { requestAnimationFrame(frame); return; }
     // 카운트다운
@@ -464,7 +466,7 @@ function frame(now) {
       wasAlive = me.alive;
       if (pendingRou && now >= pendingRou.t && (S.kind !== 'client' || W.snaps.length)) {
         const lo = { ...me.lo }, title = pendingRou.title; pendingRou = null;
-        hud.roulette(lo, title, () => { for (const k of ['p', 'm', 's', 't']) { const it = itemOf(k, lo[k]); if (codexAdd(k, lo[k]) && inMatch) hud.announce(`📖 도감 등록: ${it.name}`, RARITY[it.r].color, 0, true); if (it.r === 3) stats.legend++; } store.set('stats', stats); });
+        hud.roulette(lo, title, () => { for (const k of ['p', 'm', 's', 'u', 't']) { const it = itemOf(k, lo[k]); if (codexAdd(k, lo[k]) && inMatch) hud.announce(`📖 도감 등록: ${it.name}`, RARITY[it.r].color, 0, true); if (it.r === 3) stats.legend++; } store.set('stats', stats); });
       }
     }
     hud.updateRoulette(dt);
@@ -481,10 +483,15 @@ function frame(now) {
     R.updateCamera(tx, ty, dt, camSnap); camSnap = false;
     const ri = hud.reloadInfo || { reloading: false, rp: 1 };
     let aimLine = null;
-    if (mobile && me && me.alive && (input.atk.aiming || input.skl.aiming)) {
-      const isSk = !input.atk.aiming, w = PRIMARY[me.lo.p], sk = SKILL[me.lo.s].id;
-      const len = isSk ? ({ blink: 90, strike: 140, dash: 70, turret: 14, banana: 18 }[sk] || 40) : Math.min(260, w.b.hitscan ? w.b.range : w.b.spd * w.b.life);
-      aimLine = { ang: aim, len, skill: isSk, spread: isSk ? 0 : (w.b.count ? w.b.spread : 0), circle: isSk && (sk === 'strike' || sk === 'blink') };
+    if (mobile && me && me.alive && (input.atk.aiming || input.skl.aiming || input.sup.aiming)) {
+      if (input.sup.aiming) {
+        const su = SUPER[me.lo.u];
+        aimLine = { ang: aim, len: su.range, skill: true, superAim: true, spread: su.id === 'blizzard' ? 0.6 : 0, circle: ['jbomb', 'meteor', 'leap'].includes(su.id), through: su.id === 'jbomb' || su.id === 'leap' };
+      } else {
+        const isSk = !input.atk.aiming, w = PRIMARY[me.lo.p], sk = SKILL[me.lo.s].id;
+        const len = isSk ? ({ blink: 90, strike: 140, dash: 70, turret: 14, banana: 18 }[sk] || 40) : Math.min(260, w.b.hitscan ? w.b.range : w.b.spd * w.b.life);
+        aimLine = { ang: aim, len, skill: isSk, spread: isSk ? 0 : (w.b.count ? w.b.spread : 0), circle: isSk && (sk === 'strike' || sk === 'blink') };
+      }
     }
     R.render(W, me, dt, { aimLine, event: W.event?.id, crosshair: !mobile && input.usedMouse ? { x: input.mouseX, y: input.mouseY } : null, reloading: ri.reloading, reloadPct: ri.rp });
     hud.update(S, W, me, dt, mobile);

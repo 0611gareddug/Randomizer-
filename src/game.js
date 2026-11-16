@@ -1,7 +1,7 @@
 // 세션(오프라인/방장/참가자), 클라이언트 월드, 이벤트 연출
 import { Game, TICK, stepMovement, stepBullet, playerScale, RESPAWN_TIME } from './sim.js';
-import { getMap, MAP_LIST } from './maps.js';
-import { PRIMARY, MELEE, SKILL, TAUNT, EVENTS, SLOTS, RARITY } from './data.js';
+import { getMap, MAP_LIST, bushAt } from './maps.js';
+import { PRIMARY, MELEE, SKILL, TAUNT, SUPER, EVENTS, SLOTS, RARITY } from './data.js';
 import { sfx } from './audio.js';
 import { Host, Client, MAX_PLAYERS } from './net.js';
 import { dist2, rand, filterChat, clamp } from './util.js';
@@ -13,7 +13,7 @@ const SKILL_SFX = { dash: 'dash', smoke: 'smoke', banana: 'deploy', pudding: 'he
 export function smokeAt(objs, x, y) { for (const o of objs) if (o.k === 'smoke' && dist2(o.x, o.y, x, y) < o.r * o.r) return o; return null; }
 
 // ── 참가자용 월드 ──
-const OBJ_K = { 1: 'smoke', 2: 'banana', 3: 'turret', 4: 'decoy', 5: 'vortex', 6: 'strike', 7: 'food', 8: 'jelly', 9: 'drop', 10: 'crate' };
+const OBJ_K = { 1: 'smoke', 2: 'banana', 3: 'turret', 4: 'decoy', 5: 'vortex', 6: 'strike', 7: 'food', 8: 'jelly', 9: 'drop', 10: 'crate', 11: 'lob', 12: 'turret', 13: 'strike' };
 export class ClientWorld {
   constructor(map, settings, myId) {
     this.map = map; this.mode = settings.mode; this.settings = settings; this.myId = myId;
@@ -22,13 +22,19 @@ export class ClientWorld {
     this.me = null; this.lastSnapAt = 0; this.tmAt = 0;
   }
   smokeAt(x, y) { return smokeAt(this.objs, x, y); }
+  hiddenFrom(t, viewer) {
+    if (!t.alive || t.revealT > 0) return false;
+    if (viewer && this.mode === 'tdm' && viewer.team === t.team) return false;
+    if (!bushAt(this.map, t.x, t.y)) return false;
+    return !viewer || dist2(t.x, t.y, viewer.x, viewer.y) > 44 * 44;
+  }
   applyRoster(r) {
     const seen = new Set();
     for (const [id, name, color, face, hat, team, bot, dummy] of r) {
       seen.add(id);
       let p = this.byId.get(id);
       if (!p) {
-        p = { id, x: 0, y: 0, vx: 0, vy: 0, aim: 0, r: 6, hp: 100, maxHp: 100, alive: false, lo: { p: 0, m: 0, s: 0, t: 0 }, kills: 0, deaths: 0, streak: 0, dmg: 0, swingT: 9, warp: -1, warpSeen: -1,
+        p = { id, x: 0, y: 0, vx: 0, vy: 0, aim: 0, r: 6, hp: 100, maxHp: 100, alive: false, lo: { p: 0, m: 0, s: 0, t: 0, u: 0 }, superCh: 0, revealT: 0, spinT: 0, leapT: 0, kills: 0, deaths: 0, streak: 0, dmg: 0, swingT: 9, warp: -1, warpSeen: -1,
           in: { mx: 0, my: 0 }, invulnT: 0, shieldT: 0, burnT: 0, frozenT: 0, tauntT: 0, reloadT: 0, healT: 0, hurtT: 0, stunT: 0, slowT: 0, giantT: 0, slipT: 0, chill: 0, skillCd: 0, meleeCd: 0, respawnT: 0, ammo: 0, reloadPct: 100, killedBy: -1, tauntCd: 0 };
         this.players.push(p); this.byId.set(id, p);
         if (id === this.myId) this.me = p;
@@ -55,7 +61,8 @@ export class ClientWorld {
       p.hp = a[4]; p.maxHp = a[5]; p.warp = a[7];
       p.lo.p = a[8]; p.lo.m = a[9]; p.lo.s = a[10]; p.lo.t = a[11]; p.ammo = a[12]; p.reloadPct = a[13];
       p.skillCd = a[14]; p.meleeCd = a[15]; p.respawnT = a[16]; p.chill = a[17];
-      p.slowT = a[18]; p.frozenT = a[19]; p.stunT = a[20]; p.tauntT = a[21]; p.giantT = a[22]; p.slipT = a[23]; p.killedBy = a[24]; p.tauntCd = a[25];
+      p.slowT = a[18]; p.frozenT = a[19]; p.stunT = a[20]; p.tauntT = a[21]; p.giantT = a[22]; p.slipT = a[23]; p.killedBy = a[24]; p.tauntCd = a[25]; p.lo.u = a[26] | 0; p.superCh = (a[27] | 0) / 100;
+      p.revealT = f & 16384 ? 1 : 0; p.spinT = f & 32768 ? 1 : 0; p.leapT = f & 65536 ? 1 : 0;
       p.r = 6 * playerScale(p, this.event?.id);
       if (p === this.me) {
         if (p.warp !== p.warpSeen || (!wasAlive && p.alive)) { p.x = a[1]; p.y = a[2]; p.vx = p.vy = 0; p.warpSeen = p.warp; }
@@ -66,14 +73,15 @@ export class ClientWorld {
     this.objs = s.o.map((a) => {
       const k = OBJ_K[a[0]], o = prev.get(a[1]) || { id: a[1], k };
       o.k = k; o.tx = a[2]; o.ty = a[3];
-      if (o.x === undefined || k !== 'decoy') { o.x = a[2]; o.y = a[3]; }
+      if (o.x === undefined || (k !== 'decoy' && k !== 'lob')) { o.x = a[2]; o.y = a[3]; }
       switch (k) {
         case 'smoke': o.r = a[4]; o.life = a[5]; o.owner = a[6]; break;
         case 'banana': o.team = a[4]; o.owner = a[6]; break;
-        case 'turret': o.aim = a[4]; o.life = a[5]; o.owner = a[6]; o.team = this.byId.get(a[6])?.team ?? -1; break;
+        case 'turret': o.aim = a[4]; o.life = a[5]; o.owner = a[6]; o.big = a[0] === 12; o.team = this.byId.get(a[6])?.team ?? -1; break;
+        case 'lob': o.h = a[4]; o.owner = a[6]; break;
         case 'decoy': o.aim = a[4]; o.r = a[5]; o.owner = a[6]; o.team = this.byId.get(a[6])?.team ?? -1; break;
         case 'vortex': o.life = a[4]; o.owner = a[6]; break;
-        case 'strike': o.t = a[4]; o.phase = a[5]; break;
+        case 'strike': o.t = a[4]; o.phase = a[5]; o.meteor = a[0] === 13; break;
         case 'food': o.ft = a[4]; break;
         case 'drop': o.t = a[4]; break;
       }
@@ -98,7 +106,7 @@ export class ClientWorld {
       p.vx = (x - p.x) / Math.max(dt, 0.001); p.vy = (y - p.y) / Math.max(dt, 0.001);
       p.x = x; p.y = y; p.aim = aim;
     }
-    for (const o of this.objs) if (o.k === 'decoy') { o.x += (o.tx - o.x) * Math.min(1, dt * 12); o.y += (o.ty - o.y) * Math.min(1, dt * 12); }
+    for (const o of this.objs) if (o.k === 'decoy' || o.k === 'lob') { o.x += (o.tx - o.x) * Math.min(1, dt * 12); o.y += (o.ty - o.y) * Math.min(1, dt * 12); }
     // 로컬 타이머
     for (const p of this.players) {
       p.swingT += dt; p.hurtT = Math.max(0, p.hurtT - dt);
@@ -163,6 +171,27 @@ export class Presenter {
           if (e[1] === me) { if (w.id === 'shotgun' || w.id === 'sniper' || w.id === 'blackhole') R.shake(1.5); else if (w.id !== 'dryer') R.shake(0.4); }
           break;
         }
+        case 'sup': {
+          const p = W.byId.get(e[1]); if (!p) break;
+          const su = SUPER[e[2]];
+          if (this.isClient) p.aim = e[3];
+          R.ring(p.x, p.y, 26, '#ffd23f', 0.45); R.burst(p.x, p.y, '#ffd23f', 14, 90, 0.5);
+          R.bubble(e[1], '★ ' + su.name);
+          this.s('legend', p.x, p.y, 0.5);
+          if (su.id === 'whirl') this.s('dash', p.x, p.y);
+          if (su.id === 'rush') this.s('dash', p.x, p.y);
+          if (su.id === 'jbomb') this.s('duckshot', p.x, p.y);
+          if (su.id === 'meteor') this.s('alarm', p.x, p.y, 0.4);
+          break;
+        }
+        case 'sready': if (e[1] === me) { this.hooks.announce('★ 궁극기 준비 완료!', '#ffd23f', 0, true); sfx('rare', 0.6); } break;
+        case 'cone': {
+          const [x, y, ang, len] = [e[1], e[2], e[3], e[4]];
+          for (let i = 0; i < 26; i++) { const a = ang + rand(-0.6, 0.6), sp = rand(80, len * 2.4); R.part(x, y, Math.cos(a) * sp, Math.sin(a) * sp, rand(0.3, 0.55), rand(1, 3) | 0, i % 3 ? '#c8f4ff' : '#ffffff', 0, 0, 2); }
+          this.s('ice', x, y); this.s('smoke', x, y, 0.6);
+          break;
+        }
+        case 'leap': R.leap(e[1], e[2], e[3], e[4], e[5], e[6]); this.s('grow', e[2], e[3]); break;
         case 'chg': {
           const p = W.byId.get(e[1]); if (!p) break;
           R.charge(e[1], e[2], e[3], PRIMARY[e[4]].b.range || 360);
@@ -480,7 +509,7 @@ export class ClientSession extends BaseSession {
     if (this.sendAcc >= 1 / 30 && W.me && this.inp) {
       this.sendAcc = 0;
       const me = W.me, i = this.inp;
-      this.net.send({ t: 'i', x: Math.round(me.x * 10) / 10, y: Math.round(me.y * 10) / 10, vx: Math.round(me.vx), vy: Math.round(me.vy), mx: Math.round(i.mx * 100) / 100, my: Math.round(i.my * 100) / 100, a: Math.round(i.aim * 1000) / 1000, f: i.fire ? 1 : 0, fn: i.fireN, mn: i.meleeN, sn: i.skillN, tn: i.tauntN, rn: i.reloadN, w: me.warpSeen });
+      this.net.send({ t: 'i', x: Math.round(me.x * 10) / 10, y: Math.round(me.y * 10) / 10, vx: Math.round(me.vx), vy: Math.round(me.vy), mx: Math.round(i.mx * 100) / 100, my: Math.round(i.my * 100) / 100, a: Math.round(i.aim * 1000) / 1000, f: i.fire ? 1 : 0, fn: i.fireN, mn: i.meleeN, sn: i.skillN, tn: i.tauntN, rn: i.reloadN, un: i.superN, w: me.warpSeen });
     }
   }
   sendChat(text) { this.net.send({ t: 'c', text }); }

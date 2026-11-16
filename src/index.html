@@ -157,7 +157,9 @@
       <div class="body help">
         <b style="color:var(--acc)">🎰 핵심 규칙</b>
         <ul>
-          <li>부활할 때마다 <b>주무기 · 근접 · 스킬 · 도발</b> 4칸이 룰렛으로 무작위 결정돼요.</li>
+          <li>부활할 때마다 <b>주무기 · 근접 · 스킬 · 궁극기 · 도발</b> 5칸이 룰렛으로 무작위 결정돼요.</li>
+          <li>⭐ <b>궁극기</b>: 적을 맞히면 게이지가 차요. 가득 차면 발밑이 노랗게 빛나고 궁극기를 쓸 수 있어요.</li>
+          <li>🌿 <b>수풀</b>: 들어가면 멀리 있는 적에게 보이지 않아요. 공격하거나 맞으면 잠깐 드러나고, 적이 바로 옆까지 오면 들켜요.</li>
           <li>등급: <span style="color:var(--r0)">일반</span> · <span style="color:var(--r1)">희귀</span> · <span style="color:var(--r2)">영웅</span> · <span style="color:var(--r3)">전설</span> — 높을수록 강하지만 일반으로도 충분히 이길 수 있어요.</li>
           <li>적을 처치하면 체력 25 회복. 5초간 맞지 않으면 체력이 천천히 차올라요. 맵의 피자·우유·젤리로도 회복!</li>
           <li><b style="color:var(--acc)">보급품</b>이 주기적으로 떨어져요. 먼저 먹으면 <b style="color:var(--r3)">전설 장비</b> 확정!</li>
@@ -167,13 +169,14 @@
         <b style="color:var(--acc)">⌨ PC</b>
         <ul>
           <li><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> 이동 · <kbd>마우스</kbd> 조준 · <kbd>좌클릭</kbd> 발사</li>
-          <li><kbd>Q</kbd> 또는 <kbd>우클릭</kbd> 근접 · <kbd>E</kbd>/<kbd>Space</kbd> 스킬 · <kbd>F</kbd> 도발 · <kbd>R</kbd> 재장전</li>
+          <li><kbd>Q</kbd> 또는 <kbd>우클릭</kbd> 근접 · <kbd>E</kbd> 스킬 · <kbd>Space</kbd> 궁극기 · <kbd>F</kbd> 도발 · <kbd>R</kbd> 재장전</li>
           <li><kbd>Tab</kbd> 점수판 · <kbd>Enter</kbd> 채팅 · <kbd>V</kbd> 빠른 채팅 · <kbd>Esc</kbd> 메뉴</li>
         </ul>
         <b style="color:var(--acc)">📱 모바일</b>
         <ul>
           <li>왼쪽 아래 <b>고정 이동 스틱</b>으로 이동 (왼쪽 화면 아무 곳이나 눌러도 스틱이 반응해요)</li>
           <li>🔴 <b>공격 스틱</b>: 끌면 조준선이 보이고 손을 떼면 그 방향으로 발사 · 짧게 탭하면 가장 가까운 적에게 자동 발사 · 연사 무기는 끄는 동안 계속 발사</li>
+          <li>🟡 <b>궁극기 스틱</b>: 게이지가 차면 빛나요. 끌어서 조준하고 떼면 발동, 탭하면 자동 조준</li>
           <li>🔵 <b>스킬 스틱</b>: 끌어서 방향을 정하고 떼면 발동 · 탭하면 자동 방향 · 가운데로 되돌려 떼면 취소</li>
           <li>근접 · 도발 · 재장전은 버튼으로, 장비 아이콘과 쿨다운이 표시돼요.</li>
           <li>오른쪽 위 ⛶ 버튼으로 전체화면. 가로 화면으로 즐겨 주세요.</li>
@@ -238,6 +241,7 @@
   <div id="touch" class="hidden">
     <div id="stickZone"><div id="stickBase"></div><div id="stickKnob"></div></div>
     <div class="aimStick" id="tFire"><img alt=""><span class="cd"></span><span class="amt"></span><span class="lbl">공격</span><div class="knob"></div></div>
+    <div class="aimStick su" id="tSuper"><img alt=""><span class="cd"></span><span class="lbl">궁극기</span><div class="knob"></div></div>
     <div class="aimStick sk" id="tSkill"><img alt=""><span class="cd"></span><span class="lbl">스킬</span><div class="knob"></div></div>
     <button class="tb" id="tMelee"><img alt=""><span class="cd"></span><span class="lbl">근접</span></button>
     <button class="tb" id="tTaunt"><img alt=""><span class="cd"></span><span class="lbl">도발</span></button>

@@ -1,5 +1,5 @@
 // 렌더러: 저해상도 버퍼에 픽셀 아트를 그리고 정수배 확대. 글자는 고해상도 오버레이
-import { icon, slimeSprite, slimeFlash, drawFace, drawHat, renderMapCanvas, themeOf, shade } from './sprites.js';
+import { icon, slimeSprite, slimeFlash, drawFace, drawHat, renderMapCanvas, renderBushCanvas, themeOf, shade } from './sprites.js';
 import { PRIMARY, MELEE, SKILL, TAUNT } from './data.js';
 import { TILE, raycast } from './maps.js';
 import { Pool, TAU, clamp, rand } from './util.js';
@@ -27,6 +27,7 @@ export class Renderer {
     this.map = map;
     this.mapCanvas = renderMapCanvas(map);
     this.mctx = this.mapCanvas.getContext('2d');
+    this.bushCanvas = renderBushCanvas(map); this.leaps = new Map(); this._vis = [];
     this.theme = themeOf(map.theme);
     this.belts = [];
     for (let j = 0; j < map.h; j++) for (let i = 0; i < map.w; i++) { const t = map.grid[j * map.w + i]; if (t >= 4 && t <= 7) this.belts.push([i, j, t]); }
@@ -65,6 +66,7 @@ export class Renderer {
     if (this.nums.length > 40) this.nums.shift();
   }
   charge(id, ang, dur, range) { this.charges.set(id, { ang, t: dur, max: dur, range }); }
+  leap(id, x0, y0, x1, y1, dur) { this.leaps.set(id, { x0, y0, x1, y1, t: 0, dur }); }
   bubble(id, text) { this.bubbles.set(id, { text, t: 2.2 }); }
   pigeon(x, y) { this.pigeons.push({ x, y, t: 0 }); }
   splat(x, y, color) {
@@ -135,12 +137,14 @@ export class Renderer {
       const x = Math.round(o.x - cx), y = Math.round(o.y - cy);
       switch (o.k) {
         case 'banana': b.drawImage(icon('banana'), x - 6, y - 6); break;
+        case 'lob': this.shadow(b, x, y + 4, 5); b.drawImage(icon('jbomb'), x - 6, (y - 8 - (o.h || 0)) | 0); break;
         case 'food': this.shadow(b, x, y + 5, 5); b.drawImage(icon(o.ft === 0 ? 'pizza' : 'milk'), x - 6, (y - 8 + bob) | 0); break;
         case 'jelly': this.shadow(b, x, y + 4, 4); b.drawImage(icon('jelly'), x - 6, (y - 8 + bob) | 0); break;
         case 'strike': {
           const blink = ((this.time * 10) | 0) % 2;
-          b.strokeStyle = blink ? '#ff3b4f' : '#ffd23f'; b.lineWidth = 1;
-          const rr = 14 + (o.t || 0) * 12;
+          b.strokeStyle = o.meteor ? (blink ? '#ff8f1f' : '#c46bff') : blink ? '#ff3b4f' : '#ffd23f'; b.lineWidth = 1;
+          const rr = (o.meteor ? 26 : 14) + (o.t || 0) * 12;
+          if (o.meteor && o.t > 0) for (let k = 0; k < 2; k++) { const fx = x + 40 - o.t * 44 + k * 9, fy = y - 70 + (0.9 - o.t) * 70 + k * 5; b.fillStyle = '#ffd23f'; b.fillRect(fx | 0, fy | 0, 3, 3); b.fillStyle = '#ff8f1f'; b.fillRect((fx + 3) | 0, (fy - 3) | 0, 2, 2); }
           b.beginPath(); b.arc(x + 0.5, y + 0.5, rr, 0, TAU); b.stroke();
           b.fillStyle = b.strokeStyle; b.fillRect(x - 6, y, 13, 1); b.fillRect(x, y - 6, 1, 13);
           break;
@@ -169,6 +173,14 @@ export class Renderer {
           break;
         }
         case 'turret': {
+          if (o.big) {
+            this.shadow(b, x, y + 6, 8);
+            b.fillStyle = '#1a1530'; b.fillRect(x - 8, y - 5, 16, 12); b.fillStyle = '#565d72'; b.fillRect(x - 7, y - 4, 14, 10);
+            b.fillStyle = '#ffd23f'; b.fillRect(x - 3, y - 9, 6, 3); b.fillStyle = W.mode === 'tdm' ? TEAM_COL[o.team] || '#fff' : '#ffd23f'; b.fillRect(x - 4, y, 8, 2);
+            b.strokeStyle = '#1a1530'; b.lineWidth = 4; b.beginPath(); b.moveTo(x, y - 1); b.lineTo(x + Math.cos(o.aim) * 12, y - 1 + Math.sin(o.aim) * 12); b.stroke();
+            b.strokeStyle = '#dfe5ee'; b.lineWidth = 2; b.beginPath(); b.moveTo(x, y - 1); b.lineTo(x + Math.cos(o.aim) * 11, y - 1 + Math.sin(o.aim) * 11); b.stroke();
+            break;
+          }
           this.shadow(b, x, y + 4, 5);
           b.fillStyle = '#1a1530'; b.fillRect(x - 5, y - 3, 10, 8); b.fillStyle = '#565d72'; b.fillRect(x - 4, y - 2, 8, 6);
           b.fillStyle = W.mode === 'tdm' ? TEAM_COL[o.team] || '#fff' : '#ffd23f'; b.fillRect(x - 2, y, 4, 2);
@@ -184,13 +196,41 @@ export class Renderer {
     for (const p of W.players) {
       if (!p.alive || !inView(p.x, p.y)) continue;
       if (p !== me && W.smokeAt(p.x, p.y) && !(meInSmoke && meInSmoke === W.smokeAt(p.x, p.y)) && !(W.mode === 'tdm' && me && p.team === me.team)) continue;
+      if (p !== me && W.hiddenFrom(p, me)) continue;
       ents.push(p);
     }
     for (const o of W.objs) if (o.k === 'decoy' && inView(o.x, o.y)) ents.push(o);
     ents.sort((a, c) => a.y - c.y);
+    const vis = this._vis; vis.length = 0;
     for (const e of ents) {
-      if (e.k === 'decoy') { const own = W.byId.get(e.owner); if (own) this.drawSlime(b, { ...own, x: e.x, y: e.y, aim: e.aim, r: e.r, alive: true, hurtT: 0, invulnT: 0, shieldT: 0, tauntT: 0, frozenT: 0, stunT: 0, swingT: 9, decoy: true, id: 'd' + e.id }, cx, cy, dt, me, W); }
-      else this.drawSlime(b, e, cx, cy, dt, me, W);
+      if (e.k === 'decoy') { const own = W.byId.get(e.owner); if (own) { const d = { ...own, x: e.x, y: e.y, aim: e.aim, r: e.r, alive: true, hurtT: 0, invulnT: 0, shieldT: 0, tauntT: 0, frozenT: 0, stunT: 0, swingT: 9, spinT: 0, decoy: true, id: 'd' + e.id }; this.drawSlime(b, d, cx, cy, dt, me, W); vis.push(d); } continue; }
+      const lp = this.leaps.get(e.id);
+      if (lp) {
+        lp.t += dt; const k = Math.min(1, lp.t / lp.dur);
+        if (k >= 1 && !e.leapT) { this.leaps.delete(e.id); }
+        else {
+          const d = { ...e, x: lp.x0 + (lp.x1 - lp.x0) * k, y: lp.y0 + (lp.y1 - lp.y0) * k, _lift: Math.sin(k * Math.PI) * 34, swingT: 9, _me: e === me };
+          this.drawSlime(b, d, cx, cy, dt, me, W); vis.push(d); continue;
+        }
+      }
+      this.drawSlime(b, e, cx, cy, dt, me, W); vis.push(e);
+    }
+    // 수풀 (캐릭터 위). 나와 아군이 들어간 수풀은 반투명하게
+    {
+      const sx = Math.max(0, cx), sy = Math.max(0, cy), sw = Math.min(map.pw - sx, vw - (sx - cx)), sh = Math.min(map.ph - sy, vh - (sy - cy));
+      if (sw > 0 && sh > 0 && map.bushCount) {
+        const holes = [];
+        for (const p of W.players) if (p.alive && (p === me || (W.mode === 'tdm' && me && p.team === me.team)) && W.map && this.inBush(p)) holes.push(p);
+        if (holes.length) {
+          b.save(); b.beginPath(); b.rect(0, 0, vw, vh);
+          for (const p of holes) { b.moveTo(p.x - cx + 15, p.y - cy - 2); b.arc(p.x - cx, p.y - cy - 2, 15, 0, TAU); }
+          b.clip('evenodd');
+          b.drawImage(this.bushCanvas, sx, sy, sw, sh, sx - cx, sy - cy, sw, sh);
+          b.restore();
+          b.save(); b.beginPath(); for (const p of holes) { b.moveTo(p.x - cx + 15, p.y - cy - 2); b.arc(p.x - cx, p.y - cy - 2, 15, 0, TAU); } b.clip();
+          b.globalAlpha = 0.4; b.drawImage(this.bushCanvas, sx, sy, sw, sh, sx - cx, sy - cy, sw, sh); b.globalAlpha = 1; b.restore();
+        } else b.drawImage(this.bushCanvas, sx, sy, sw, sh, sx - cx, sy - cy, sw, sh);
+      }
     }
     // 탄
     for (const bl of W.bullets) {
@@ -285,8 +325,8 @@ export class Renderer {
 
   drawAim(b, me, cx, cy, A) {
     const x0 = me.x, y0 = me.y;
-    const ray = (ang) => { const ex = x0 + Math.cos(ang) * A.len, ey = y0 + Math.sin(ang) * A.len; const f = raycast(this.map, x0, y0, ex, ey); return [x0 + (ex - x0) * f, y0 + (ey - y0) * f]; };
-    const col = A.skill ? '120,200,255' : '255,255,255';
+    const ray = (ang) => { const ex = x0 + Math.cos(ang) * A.len, ey = y0 + Math.sin(ang) * A.len; const f = A.through ? 1 : raycast(this.map, x0, y0, ex, ey); return [x0 + (ex - x0) * f, y0 + (ey - y0) * f]; };
+    const col = A.superAim ? '255,210,63' : A.skill ? '120,200,255' : '255,255,255';
     const drawLine = (ang, alpha) => {
       const [ex, ey] = ray(ang), dx = ex - x0, dy = ey - y0, L = Math.hypot(dx, dy), n = Math.floor(L / 6);
       b.fillStyle = `rgba(${col},${alpha})`;
@@ -299,6 +339,8 @@ export class Renderer {
     if (A.circle) { b.beginPath(); b.arc(Math.round(ex - cx) + 0.5, Math.round(ey - cy) + 0.5, 12, 0, TAU); b.stroke(); }
     else { b.beginPath(); b.arc(Math.round(ex - cx) + 0.5, Math.round(ey - cy) + 0.5, 3, 0, TAU); b.stroke(); }
   }
+
+  inBush(p) { const m = this.map, tx = (p.x / TILE) | 0, ty = (p.y / TILE) | 0; return tx >= 0 && ty >= 0 && tx < m.w && ty < m.h && m.grid[ty * m.w + tx] === 8; }
 
   shadow(b, x, y, w) { b.fillStyle = 'rgba(0,0,0,0.28)'; b.fillRect((x - w) | 0, y | 0, (w * 2) | 0, 2); b.fillRect((x - w + 1) | 0, (y - 1) | 0, (w * 2 - 2) | 0, 1); }
 
@@ -329,6 +371,8 @@ export class Renderer {
     const w = 16 * sc * sx, h = 14 * sc * sy;
     const feet = y + 5 * sc;
     this.shadow(b, x, feet, 6 * sc);
+    if (p._lift) { hop -= p._lift; }
+    if (p.spinT > 0) { flip = Math.sin(this.time * 40) > 0 ? 1 : -1; if (Math.random() < 0.6) this.part(p.x + rand(-10, 10), p.y + rand(-4, 6), rand(-40, 40), rand(-30, 0), 0.3, 1, '#e6e9f0'); }
     const top = feet - h + hop;
     if (a.recoil > 0) a.recoil -= dt; this._rc = a.recoil > 0;
     const aimBehind = Math.sin(p.aim) < -0.35;
@@ -365,21 +409,9 @@ export class Renderer {
     if (p.healT > 0 && Math.random() < 0.3) this.part(p.x + rand(-6, 6), p.y + 2, 0, -25, 0.6, 1, '#7dff9b');
     if (p.giantT > 0 && Math.random() < 0.2) this.part(p.x + rand(-8, 8), p.y + rand(-8, 4), 0, -15, 0.5, 1, '#ffd23f');
     if (p.slipT > 0 && Math.random() < 0.5) this.part(p.x, p.y + 5, rand(-20, 20), rand(-10, 0), 0.3, 1, '#ffd23f');
-    // 체력바 (타인)
-    if (p !== me && !p.decoy && !p.dummyHide) {
-      const bw = 16, bx = x - 8, by = Math.round(top - (p.hat ? 9 : 5));
-      b.fillStyle = '#1a1530'; b.fillRect(bx - 1, by - 1, bw + 2, 4);
-      const f = clamp(p.hp / p.maxHp, 0, 1);
-      let col = f > 0.6 ? '#5ee07a' : f > 0.3 ? '#ffd23f' : '#ff4d5e';
-      if (W.mode === 'tdm') col = TEAM_COL[p.team] || col;
-      b.fillStyle = '#3a3448'; b.fillRect(bx, by, bw, 2);
-      b.fillStyle = col; b.fillRect(bx, by, Math.ceil(bw * f), 2);
-    } else if (p.decoy) {
-      const bx = x - 8, by = Math.round(top - (p.hat ? 9 : 5));
-      b.fillStyle = '#1a1530'; b.fillRect(bx - 1, by - 1, 18, 4); b.fillStyle = '#3a3448'; b.fillRect(bx, by, 16, 2);
-      b.fillStyle = W.mode === 'tdm' ? TEAM_COL[p.team] : '#5ee07a'; b.fillRect(bx, by, 16, 2);
-    }
-    p._sy = top; // 이름 위치용
+    if (p.spinT > 0) { b.strokeStyle = 'rgba(255,255,255,0.6)'; b.lineWidth = 1; b.beginPath(); b.arc(x, y, 30, this.time * 12, this.time * 12 + 4); b.stroke(); }
+    if ((p === me || p._me) && me.superCh >= 1) { const g = 0.5 + Math.sin(this.time * 8) * 0.3; b.strokeStyle = `rgba(255,210,63,${g})`; b.lineWidth = 1; b.beginPath(); b.ellipse(x, feet + 1, 10 * sc, 4 * sc, 0, 0, TAU); b.stroke(); }
+    p._sy = top + cy; // 이름 위치용 (월드 좌표)
   }
 
   drawWeapon(b, p, x, y, sc) {
@@ -476,17 +508,42 @@ export class Renderer {
     const fs = Math.round(10 * dpr * this.uiScale);
     ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
     ctx.lineJoin = 'round';
-    // 이름
-    ctx.font = `${fs}px Galmuri11, monospace`;
+    // 이름 + 체력바 (고해상도)
     ctx.lineWidth = Math.max(2, 3 * dpr);
-    for (const p of W.players) {
-      if (!p.alive || p === me || p._sy === undefined || p.dummyHide) continue;
-      if (W.smokeAt(p.x, p.y) && !(W.mode === 'tdm' && me && p.team === me.team) && !(me && W.smokeAt(me.x, me.y))) continue;
-      const x = (p.x - cx) * S + ox, y = (p._sy - cy - (p.hat ? 10 : 6)) * S + oy;
-      if (x < -50 || y < -20 || x > this.canvas.width + 50 || y > this.canvas.height + 20) continue;
-      ctx.strokeStyle = 'rgba(20,16,36,0.9)'; ctx.strokeText(p.name, x, y);
-      ctx.fillStyle = W.mode === 'tdm' ? (p.team === 0 ? '#ffb3bd' : '#b3d6ff') : (p.bot ? '#e6e9f0' : '#ffffff');
-      ctx.fillText(p.name, x, y);
+    const zs = S / dpr, tfs = Math.round((9 + zs) * dpr * this.uiScale);
+    for (const p of this._vis) {
+      if (p._sy === undefined || p.dummyHide) continue;
+      const x = (p.x - cx) * S + ox, topY = (p._sy - cy - (p.hat ? 7 : 3)) * S + oy;
+      if (x < -60 || topY < -40 || x > this.canvas.width + 60 || topY > this.canvas.height + 40) { p._sy = undefined; continue; }
+      const isMe = p === me || p._me, ally = !isMe && W.mode === 'tdm' && me && p.team === me.team;
+      const bw = Math.round((42 + 5 * zs) * dpr * this.uiScale), bh = Math.round((5 + zs * 0.6) * dpr * this.uiScale);
+      const bx = Math.round(x - bw / 2), by = Math.round(topY - bh);
+      const f = clamp(p.hp / p.maxHp, 0, 1);
+      ctx.fillStyle = 'rgba(20,16,36,0.92)'; ctx.fillRect(bx - 2, by - 2, bw + 4, bh + 4);
+      ctx.fillStyle = '#3a3448'; ctx.fillRect(bx, by, bw, bh);
+      ctx.fillStyle = isMe ? '#5ee07a' : ally ? '#4fa8ff' : '#ff4d5e'; ctx.fillRect(bx, by, Math.ceil(bw * f), bh);
+      ctx.fillStyle = 'rgba(255,255,255,0.35)'; ctx.fillRect(bx, by, Math.ceil(bw * f), Math.max(1, bh / 3) | 0);
+      // 체력 숫자
+      ctx.font = `bold ${tfs}px Galmuri11, monospace`; ctx.textBaseline = 'bottom';
+      const hpTxt = String(Math.max(0, Math.ceil(p.hp)));
+      ctx.strokeStyle = 'rgba(20,16,36,0.95)'; ctx.strokeText(hpTxt, x, by - 3);
+      ctx.fillStyle = '#ffffff'; ctx.fillText(hpTxt, x, by - 3);
+      // 내 탄약 칸
+      if (isMe && p.lo) {
+        const w = PRIMARY[p.lo.p], ay = by + bh + 4, ah = Math.max(3, Math.round(bh * 0.7));
+        ctx.fillStyle = 'rgba(20,16,36,0.92)'; ctx.fillRect(bx - 2, ay - 1, bw + 4, ah + 2);
+        if (opt.reloading) { ctx.fillStyle = '#7a5a10'; ctx.fillRect(bx, ay, bw, ah); ctx.fillStyle = '#ff9f1f'; ctx.fillRect(bx, ay, Math.round(bw * opt.reloadPct), ah); }
+        else if (w.mag <= 12) { const seg = bw / w.mag; for (let i = 0; i < w.mag; i++) { ctx.fillStyle = i < p.ammo ? '#ffd23f' : '#4a4256'; ctx.fillRect(Math.round(bx + i * seg), ay, Math.max(1, Math.round(seg) - 1), ah); } }
+        else { ctx.fillStyle = '#4a4256'; ctx.fillRect(bx, ay, bw, ah); ctx.fillStyle = '#ffd23f'; ctx.fillRect(bx, ay, Math.round(bw * p.ammo / w.mag), ah); }
+      }
+      // 이름
+      if (!isMe) {
+        ctx.font = `${fs}px Galmuri11, monospace`;
+        const ny = by - 3 - tfs - 1;
+        ctx.strokeStyle = 'rgba(20,16,36,0.9)'; ctx.strokeText(p.name, x, ny);
+        ctx.fillStyle = W.mode === 'tdm' ? (p.team === 0 ? '#ffb3bd' : '#b3d6ff') : (p.bot ? '#e6e9f0' : '#ffffff');
+        ctx.fillText(p.name, x, ny);
+      }
       p._sy = undefined;
     }
     // 감정표현 말풍선

@@ -1,5 +1,5 @@
 // 봇 AI: 난이도별 반응속도/조준오차, 흐름장 길찾기, 무기별 교전거리
-import { PRIMARY, MELEE, SKILL } from './data.js';
+import { PRIMARY, MELEE, SKILL, SUPER } from './data.js';
 import { flowField, flowDir, lineOfSight, solidPx } from './maps.js';
 import { angDiff, rand, dist2, clamp } from './util.js';
 
@@ -31,6 +31,7 @@ export function botThink(g, p, dt) {
       const d = Math.sqrt(dist2(p.x, p.y, t.x, t.y));
       if (d > D.see) continue;
       if (t.k !== 'decoy' && g.inSmoke(t) && d > 28) continue;
+      if (g.hiddenFrom(t, p)) continue;
       if (!lineOfSight(g.map, p.x, p.y, t.x, t.y)) continue;
       let s = d - (t === ai.target ? 60 : 0) + (t.hp !== undefined ? t.hp * 0.4 : 20);
       if (t.invulnT > 0) s += 80;
@@ -110,6 +111,12 @@ export function botThink(g, p, dt) {
     const facing = Math.abs(angDiff(p.aim, want)) < 0.3;
     if (ai.reactT <= 0 && facing && d < range * 1.05 && p.tauntT <= 0) inp.fire = true;
     if (ai.reactT <= 0 && d < mw.range + (t.r || 6) + 12 && p.meleeCd <= 0) inp.meleeN++;
+    // 궁극기
+    if (p.superCh >= 1 && ai.reactT <= 0 && Math.random() < dt * 2.5 * D.skill + dt) {
+      const su = SUPER[p.lo.u];
+      const ok = su.id === 'fortress' ? d < 200 : su.id === 'whirl' ? d < 45 : su.id === 'rush' ? d < 110 : d < su.range + 10 && d > (su.id === 'leap' || su.id === 'jbomb' || su.id === 'meteor' ? 30 : 0);
+      if (ok) inp.superN++;
+    }
     // 스킬
     if (p.skillCd <= 0 && ai.reactT <= 0 && Math.random() < D.skill * dt * 3) {
       const s = SKILL[p.lo.s].id;
