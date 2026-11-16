@@ -1,7 +1,7 @@
 // 렌더러: 저해상도 버퍼에 픽셀 아트를 그리고 정수배 확대. 글자는 고해상도 오버레이
 import { icon, slimeSprite, slimeFlash, drawFace, drawHat, renderMapCanvas, themeOf, shade } from './sprites.js';
 import { PRIMARY, MELEE, SKILL, TAUNT } from './data.js';
-import { TILE } from './maps.js';
+import { TILE, raycast } from './maps.js';
 import { Pool, TAU, clamp, rand } from './util.js';
 
 const TEAM_COL = ['#ff5d73', '#4fa8ff'];
@@ -88,8 +88,10 @@ export class Renderer {
   updateCamera(tx, ty, dt, snap) {
     const m = this.map;
     let cx = tx - this.vw / 2, cy = ty - this.vh / 2;
-    if (m.pw <= this.vw) cx = (m.pw - this.vw) / 2; else cx = clamp(cx, -8, m.pw - this.vw + 8);
-    if (m.ph <= this.vh) cy = (m.ph - this.vh) / 2; else cy = clamp(cy, -8, m.ph - this.vh + 8);
+    // 모바일은 조작 버튼에 캐릭터가 가리지 않도록 맵 밖까지 카메라가 따라감
+    const mx = this.mobile ? this.vw * 0.3 : 8, my = this.mobile ? this.vh * 0.3 : 8;
+    if (m.pw <= this.vw && !this.mobile) cx = (m.pw - this.vw) / 2; else cx = clamp(cx, -mx, m.pw - this.vw + mx);
+    if (m.ph <= this.vh && !this.mobile) cy = (m.ph - this.vh) / 2; else cy = clamp(cy, -my, m.ph - this.vh + my);
     if (snap) { this.camX = cx; this.camY = cy; }
     else { const k = 1 - Math.exp(-dt * 9); this.camX += (cx - this.camX) * k; this.camY += (cy - this.camY) * k; }
   }
@@ -194,6 +196,8 @@ export class Renderer {
       if (!inView(bl.x, bl.y, 8)) continue;
       this.drawBullet(b, bl, bl.x - cx, bl.y - cy);
     }
+    // 모바일 조준선
+    if (opt.aimLine && me) this.drawAim(b, me, cx, cy, opt.aimLine);
     // 파티클
     this.drawParticles(b, cx, cy, dt);
     // 레이
@@ -263,6 +267,23 @@ export class Renderer {
     ctx.fillStyle = this.theme.bg; ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
     ctx.drawImage(this.buf, 0, 0, vw, vh, Math.round(this.sx), Math.round(this.sy), vw * S, vh * S);
     this.drawOverlay(ctx, W, me, cx, cy, dt, opt);
+  }
+
+  drawAim(b, me, cx, cy, A) {
+    const x0 = me.x, y0 = me.y;
+    const ray = (ang) => { const ex = x0 + Math.cos(ang) * A.len, ey = y0 + Math.sin(ang) * A.len; const f = raycast(this.map, x0, y0, ex, ey); return [x0 + (ex - x0) * f, y0 + (ey - y0) * f]; };
+    const col = A.skill ? '120,200,255' : '255,255,255';
+    const drawLine = (ang, alpha) => {
+      const [ex, ey] = ray(ang), dx = ex - x0, dy = ey - y0, L = Math.hypot(dx, dy), n = Math.floor(L / 6);
+      b.fillStyle = `rgba(${col},${alpha})`;
+      for (let i = 1; i <= n; i++) { const t = i / (L / 6); b.fillRect(Math.round(x0 + dx * t / 1 - cx) - 1, Math.round(y0 + dy * t - cy) - 1, 2, 2); }
+      return [ex, ey];
+    };
+    if (A.spread > 0.05) { drawLine(A.ang - A.spread, 0.35); drawLine(A.ang + A.spread, 0.35); }
+    const [ex, ey] = drawLine(A.ang, 0.75);
+    b.strokeStyle = `rgba(${col},0.8)`; b.lineWidth = 1;
+    if (A.circle) { b.beginPath(); b.arc(Math.round(ex - cx) + 0.5, Math.round(ey - cy) + 0.5, 12, 0, TAU); b.stroke(); }
+    else { b.beginPath(); b.arc(Math.round(ex - cx) + 0.5, Math.round(ey - cy) + 0.5, 3, 0, TAU); b.stroke(); }
   }
 
   shadow(b, x, y, w) { b.fillStyle = 'rgba(0,0,0,0.28)'; b.fillRect((x - w) | 0, y | 0, (w * 2) | 0, 2); b.fillRect((x - w + 1) | 0, (y - 1) | 0, (w * 2 - 2) | 0, 1); }
@@ -399,7 +420,7 @@ export class Renderer {
       }
       case 'ice': b.fillStyle = '#4fc3ff'; b.fillRect(Math.round(x - c * 3), Math.round(y - s * 3), 2, 2); b.fillStyle = '#e6faff'; b.fillRect(x - 1, y - 1, 3, 3); break;
       case 'flame': {
-        const age = 1 - Math.max(0, bl.life) / 0.42, r = 1.5 + age * 5;
+        const age = 1 - Math.max(0, bl.life) / 0.52, r = 1.5 + age * 5;
         b.globalAlpha = Math.max(0, 0.9 - age * 0.8);
         b.fillStyle = age < 0.3 ? '#fff1a8' : age < 0.6 ? '#ff9f1f' : '#e8434f';
         b.beginPath(); b.arc(x, y, r, 0, TAU); b.fill(); b.globalAlpha = 1; break;

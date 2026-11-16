@@ -221,21 +221,30 @@ table.sb .red td:first-child { box-shadow: inset 4px 0 0 #ff5d73; } table.sb .bl
 
 /* 모바일 */
 #touch { position: fixed; inset: 0; pointer-events: none; }
-#stickZone { position: absolute; left: 0; bottom: 0; width: 44%; height: 72%; pointer-events: auto; }
-#stickBase { position: absolute; left: 0; top: 0; width: calc(120px * var(--btn)); height: calc(120px * var(--btn)); border-radius: 50%; background: rgba(255,255,255,.07); box-shadow: 0 0 0 3px rgba(255,255,255,.25); opacity: .55; }
+#stickZone { position: absolute; left: 0; bottom: 0; width: 44%; height: 75%; pointer-events: auto; }
+#stickBase { position: absolute; left: calc(36px * var(--btn)); bottom: calc(30px * var(--btn)); width: calc(132px * var(--btn)); height: calc(132px * var(--btn)); border-radius: 50%; background: rgba(255,255,255,.07); box-shadow: 0 0 0 3px rgba(255,255,255,.28), inset 0 0 0 calc(18px * var(--btn)) rgba(255,255,255,.03); opacity: .6; }
 #stickBase.on { opacity: 1; }
-#stickKnob { position: absolute; left: 0; top: 0; width: calc(54px * var(--btn)); height: calc(54px * var(--btn)); border-radius: 50%; background: rgba(255,255,255,.35); box-shadow: 0 0 0 3px rgba(20,16,36,.6); }
+#stickKnob { position: absolute; left: calc(74px * var(--btn)); bottom: calc(68px * var(--btn)); width: calc(56px * var(--btn)); height: calc(56px * var(--btn)); border-radius: 50%; background: rgba(255,255,255,.4); box-shadow: 0 0 0 3px rgba(20,16,36,.6); pointer-events: none; }
+.aimStick { position: absolute; border-radius: 50%; pointer-events: auto; background: rgba(200,60,80,.42); box-shadow: 0 0 0 3px rgba(11,9,24,.9), inset 0 0 0 calc(6px * var(--btn)) rgba(255,255,255,.08); display: flex; align-items: center; justify-content: center; }
+.aimStick.sk { background: rgba(60,140,220,.42); }
+.aimStick.down { background: rgba(230,80,100,.5); } .aimStick.sk.down { background: rgba(80,160,240,.5); }
+.aimStick.cancel { background: rgba(90,90,100,.55) !important; }
+.aimStick img { width: 46%; height: 46%; position: relative; z-index: 1; opacity: .95; }
+.aimStick .cd { position: absolute; inset: 0; border-radius: 50%; background: conic-gradient(rgba(10,8,20,.75) calc(var(--cd, 0) * 1turn), transparent 0); z-index: 2; }
+.aimStick .lbl { position: absolute; bottom: 10%; font-size: calc(10px * var(--btn)); z-index: 3; text-shadow: 0 1px 0 #000; }
+.aimStick .amt { position: absolute; top: 12%; font-size: calc(12px * var(--btn)); z-index: 3; text-shadow: 0 1px 0 #000, 1px 0 0 #000; }
+.aimStick .knob { position: absolute; left: 50%; top: 50%; width: 40%; height: 40%; border-radius: 50%; background: rgba(255,255,255,.35); box-shadow: 0 0 0 3px rgba(20,16,36,.55); transform: translate(-50%, -50%); z-index: 4; pointer-events: none; opacity: 0; }
+.aimStick.down .knob { opacity: 1; }
 .tb { position: absolute; border-radius: 50%; pointer-events: auto; border: 0; background: rgba(34,29,58,.75); box-shadow: 0 0 0 3px rgba(11,9,24,.9), inset 0 -4px 0 rgba(0,0,0,.35); display: flex; align-items: center; justify-content: center; overflow: hidden; }
 .tb.down { transform: scale(.92); background: rgba(80,70,140,.85); }
 .tb img { width: 58%; height: 58%; position: relative; z-index: 1; }
 .tb .cd { position: absolute; inset: 0; background: conic-gradient(rgba(10,8,20,.75) calc(var(--cd, 0) * 1turn), transparent 0); z-index: 2; }
 .tb .lbl { position: absolute; bottom: 8%; font-size: calc(10px * var(--btn)); z-index: 3; text-shadow: 0 1px 0 #000; }
-.tb .amt { position: absolute; top: 12%; right: 14%; font-size: calc(12px * var(--btn)); z-index: 3; text-shadow: 0 1px 0 #000, 1px 0 0 #000; }
-#tFire { width: calc(96px * var(--btn)); height: calc(96px * var(--btn)); right: calc(26px * var(--btn)); bottom: calc(26px * var(--btn)); background: rgba(200,60,80,.55); }
-#tMelee { width: calc(66px * var(--btn)); height: calc(66px * var(--btn)); right: calc(134px * var(--btn)); bottom: calc(18px * var(--btn)); }
-#tSkill { width: calc(66px * var(--btn)); height: calc(66px * var(--btn)); right: calc(116px * var(--btn)); bottom: calc(100px * var(--btn)); }
-#tTaunt { width: calc(52px * var(--btn)); height: calc(52px * var(--btn)); right: calc(40px * var(--btn)); bottom: calc(136px * var(--btn)); }
-#tReload { width: calc(44px * var(--btn)); height: calc(44px * var(--btn)); right: calc(206px * var(--btn)); bottom: calc(26px * var(--btn)); font-size: calc(16px * var(--btn)); color: #fff; }
+#tFire { width: calc(124px * var(--btn)); height: calc(124px * var(--btn)); right: calc(26px * var(--btn)); bottom: calc(24px * var(--btn)); }
+#tSkill { width: calc(86px * var(--btn)); height: calc(86px * var(--btn)); right: calc(168px * var(--btn)); bottom: calc(120px * var(--btn)); }
+#tMelee { width: calc(66px * var(--btn)); height: calc(66px * var(--btn)); right: calc(170px * var(--btn)); bottom: calc(26px * var(--btn)); }
+#tTaunt { width: calc(50px * var(--btn)); height: calc(50px * var(--btn)); right: calc(44px * var(--btn)); bottom: calc(166px * var(--btn)); }
+#tReload { width: calc(44px * var(--btn)); height: calc(44px * var(--btn)); right: calc(254px * var(--btn)); bottom: calc(30px * var(--btn)); font-size: calc(16px * var(--btn)); color: #fff; }
 body.mobile .bottom { left: auto; right: auto; bottom: auto; top: calc(10px * var(--u)); left: calc(170px * var(--u)); transform: none; align-items: flex-start; }
 body.mobile .slots { display: none; }
 body.mobile .hpBar { width: calc(170px * var(--u)); height: calc(16px * var(--u)); }

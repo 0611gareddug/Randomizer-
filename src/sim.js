@@ -6,7 +6,8 @@ import { botThink, botInit } from './bot.js';
 
 export const TICK = 1 / 60;
 export const RESPAWN_TIME = 4.2;
-const BASE_SPEED = 88;
+const BASE_SPEED = 70;
+export const MAX_HP = 140;
 const BULLET_LIST_MAX = 400;
 
 // ── 공용 이동 물리 (방장과 클라이언트 예측이 동일 코드를 사용) ──
@@ -75,7 +76,7 @@ export function stepBullet(b, map, dt) {
 function makePlayer(id, o) {
   return {
     id, name: o.name, color: o.color, face: o.face | 0, hat: o.hat | 0, team: o.team ?? -1, bot: !!o.bot, remote: !!o.remote, dummy: !!o.dummy,
-    x: 0, y: 0, vx: 0, vy: 0, r: 6, aim: 0, hp: 100, maxHp: 100, alive: false, respawnT: 0, invulnT: 0,
+    x: 0, y: 0, vx: 0, vy: 0, r: 6, aim: 0, hp: MAX_HP, maxHp: MAX_HP, alive: false, respawnT: 0, invulnT: 0,
     lo: { p: 0, m: 0, s: 0, t: 0 }, ammo: 0, reloadT: 0, fireCd: 0, burstLeft: 0, burstT: 0,
     meleeCd: 0, swingT: 9, reflectT: 0, skillCd: 0, tauntT: 0, tauntCd: 0,
     slowT: 0, chill: 0, chillT: 0, frozenT: 0, stunT: 0, burnT: 0, burnTick: 0, burnBy: -1, slipT: 0,
@@ -155,7 +156,7 @@ export class Game {
       if (md > bestD) { bestD = md; best = s; }
     }
     p.x = best.x + rand(-3, 3); p.y = best.y + rand(-3, 3); p.vx = p.vy = 0;
-    p.alive = true; p.hp = p.maxHp = 100; p.invulnT = 2; p.warp++;
+    p.alive = true; p.hp = p.maxHp = MAX_HP; p.invulnT = 2; p.warp++;
     p.slowT = p.chill = p.frozenT = p.stunT = p.burnT = p.shieldT = p.giantT = p.healT = p.tauntT = p.slipT = 0;
     const w = PRIMARY[p.lo.p];
     p.ammo = w.mag; p.reloadT = 0; p.fireCd = 0.2; p.burstLeft = 0; p.meleeCd = 0; p.skillCd = 0; p.tauntCd = 0; p.swingT = 9;
@@ -225,7 +226,7 @@ export class Game {
     p.slowT = Math.max(0, p.slowT - dt); p.stunT = Math.max(0, p.stunT - dt); p.slipT = Math.max(0, p.slipT - dt);
     p.frozenT = Math.max(0, p.frozenT - dt); p.shieldT = Math.max(0, p.shieldT - dt);
     if (p.chill > 0) { p.chillT -= dt; if (p.chillT <= 0) { p.chill = 0; } }
-    if (p.giantT > 0) { p.giantT -= dt; if (p.giantT <= 0) { p.maxHp = 100; p.hp = Math.min(p.hp, 100); } }
+    if (p.giantT > 0) { p.giantT -= dt; if (p.giantT <= 0) { p.maxHp = MAX_HP; p.hp = Math.min(p.hp, MAX_HP); } }
     p.swingT += dt; p.reflectT = Math.max(0, p.reflectT - dt);
     p.meleeCd = Math.max(0, p.meleeCd - dt); p.skillCd = Math.max(0, p.skillCd - dt); p.tauntCd = Math.max(0, p.tauntCd - dt);
     p.fireCd = Math.max(0, p.fireCd - dt);
@@ -501,7 +502,7 @@ export class Game {
           this.objs.push({ k: 'decoy', id: this.nextId++, x: p.x, y: p.y, vx: Math.cos(a) * 85, vy: Math.sin(a) * 85, life: 5, owner: p.id, team: p.team, r: p.r, aim: p.aim, turnT: rand(0.4, 1) });
         }
         break;
-      case 'giant': p.giantT = 6; p.maxHp = 150; p.hp = Math.min(150, p.hp + 50); break;
+      case 'giant': p.giantT = 6; p.maxHp = MAX_HP + 60; p.hp = Math.min(p.maxHp, p.hp + 60); break;
       case 'strike': {
         const fr = raycast(this.map, p.x, p.y, p.x + ax * 150, p.y + ay * 150);
         const tx = p.x + ax * 150 * fr * 0.92, ty = p.y + ay * 150 * fr * 0.92;
@@ -748,14 +749,14 @@ export class Game {
             this.objs.push({ k: 'jelly', id: this.nextId++, x: (f % this.map.w + 0.5) * TILE, y: (((f / this.map.w) | 0) + 0.5) * TILE, life: 8 });
           }
         }
-        if (this.eventT <= 0) { this.ev.push(['ev', EVENTS.indexOf(this.event), 0]); this.event = null; this.nextEventT = this.time + 40; }
+        if (this.eventT <= 0) { this.ev.push(['ev', EVENTS.indexOf(this.event), 0]); this.event = null; this.nextEventT = this.time + 50; }
       } else if (this.time >= this.nextEventT) {
         this.event = pick(EVENTS); this.eventT = 20; this.eventTick = 0;
         this.ev.push(['ev', EVENTS.indexOf(this.event), 1]);
       }
       // 보급품
       if (this.time >= this.nextDropT) {
-        this.nextDropT = this.time + 45;
+        this.nextDropT = this.time + 55;
         const m = this.map;
         let f, tries = 0;
         do { f = m.floors[(Math.random() * m.floors.length) | 0]; tries++; }

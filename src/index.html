@@ -171,8 +171,10 @@
         </ul>
         <b style="color:var(--acc)">📱 모바일</b>
         <ul>
-          <li>왼쪽 아무 곳이나 눌러 <b>이동 스틱</b> · 오른쪽 🔥 버튼을 누르고 있으면 <b>가장 가까운 적을 자동 조준</b>해 발사</li>
-          <li>근접 · 스킬 · 도발 버튼에는 지금 장비 아이콘과 쿨다운이 표시돼요.</li>
+          <li>왼쪽 아래 <b>고정 이동 스틱</b>으로 이동 (왼쪽 화면 아무 곳이나 눌러도 스틱이 반응해요)</li>
+          <li>🔴 <b>공격 스틱</b>: 끌면 조준선이 보이고 손을 떼면 그 방향으로 발사 · 짧게 탭하면 가장 가까운 적에게 자동 발사 · 연사 무기는 끄는 동안 계속 발사</li>
+          <li>🔵 <b>스킬 스틱</b>: 끌어서 방향을 정하고 떼면 발동 · 탭하면 자동 방향 · 가운데로 되돌려 떼면 취소</li>
+          <li>근접 · 도발 · 재장전은 버튼으로, 장비 아이콘과 쿨다운이 표시돼요.</li>
           <li>오른쪽 위 ⛶ 버튼으로 전체화면. 가로 화면으로 즐겨 주세요.</li>
         </ul>
         <b style="color:var(--acc)">🌐 온라인</b>
@@ -234,9 +236,9 @@
 
   <div id="touch" class="hidden">
     <div id="stickZone"><div id="stickBase"></div><div id="stickKnob"></div></div>
-    <button class="tb" id="tFire"><img alt=""><span class="cd"></span><span class="amt"></span><span class="lbl">발사</span></button>
+    <div class="aimStick" id="tFire"><img alt=""><span class="cd"></span><span class="amt"></span><span class="lbl">공격</span><div class="knob"></div></div>
+    <div class="aimStick sk" id="tSkill"><img alt=""><span class="cd"></span><span class="lbl">스킬</span><div class="knob"></div></div>
     <button class="tb" id="tMelee"><img alt=""><span class="cd"></span><span class="lbl">근접</span></button>
-    <button class="tb" id="tSkill"><img alt=""><span class="cd"></span><span class="lbl">스킬</span></button>
     <button class="tb" id="tTaunt"><img alt=""><span class="cd"></span><span class="lbl">도발</span></button>
     <button class="tb" id="tReload">⟳</button>
   </div>

@@ -79,6 +79,11 @@ export const TAUNT = [
   { id: 'tongue', name: '메롱', r: 3, desc: '최고 등급의 놀림.', emote: '메롱' },
 ];
 
+// ── 템포 조정: 탄속·연사·쿨다운을 전체적으로 느긋하게 ──
+for (const w of PRIMARY) { w.rate *= 0.8; w.reload *= 1.12; if (w.b.spd) { w.b.spd *= 0.78; w.b.life /= 0.78 * 1.04; } }
+for (const m of MELEE) m.cd *= 1.15;
+for (const s of SKILL) s.cd = Math.round(s.cd * 1.15);
+
 export const SLOTS = [
   { key: 'p', name: '주무기', list: PRIMARY },
   { key: 'm', name: '근접', list: MELEE },

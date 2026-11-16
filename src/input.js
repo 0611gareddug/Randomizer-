@@ -12,6 +12,9 @@ export const input = {
   enabled: false,
   stick: { active: false, id: -1, ox: 0, oy: 0, x: 0, y: 0 },
   touchFire: false,
+  atk: { active: false, aiming: false, ang: 0, id: -1 },
+  skl: { active: false, aiming: false, ang: 0, id: -1 },
+  aimHold: null, tapFireUntil: 0,
   onKey: null,              // 메뉴용 키 콜백
 };
 
@@ -59,60 +62,73 @@ export function initInput(canvas) {
 }
 
 // ── 모바일 컨트롤 ──
+// 왼쪽: 고정 이동 스틱 / 오른쪽: 공격·스킬 조준 스틱 (끌어서 조준, 떼면 발동, 탭하면 자동 조준)
 export function initTouch(root) {
   const zone = root.querySelector('#stickZone');
   const base = root.querySelector('#stickBase');
   const knob = root.querySelector('#stickKnob');
-  const R = () => base.offsetWidth * 0.42;
-  const place = () => {
-    const s = input.stick;
-    base.style.transform = `translate(${s.ox - base.offsetWidth / 2}px, ${s.oy - base.offsetHeight / 2}px)`;
-    const dx = s.x - s.ox, dy = s.y - s.oy, l = Math.hypot(dx, dy), r = R();
-    const k = l > r ? r / l : 1;
-    knob.style.transform = `translate(${s.ox + dx * k - knob.offsetWidth / 2}px, ${s.oy + dy * k - knob.offsetHeight / 2}px)`;
-    input.mx = l > 4 ? (dx * k) / r : 0; input.my = l > 4 ? (dy * k) / r : 0;
+  const mv = { id: -1 };
+  const center = () => { const r = base.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2, R: r.width * 0.42 }; };
+  const setKnob = (dx, dy) => { knob.style.transform = `translate(${dx}px, ${dy}px)`; };
+  const moveTo = (x, y) => {
+    const c = center(); let dx = x - c.x, dy = y - c.y; const l = Math.hypot(dx, dy);
+    if (l > c.R) { dx *= c.R / l; dy *= c.R / l; }
+    setKnob(dx, dy);
+    input.mx = l > 6 ? dx / c.R : 0; input.my = l > 6 ? dy / c.R : 0;
   };
-  const resetStick = () => {
-    const s = input.stick; s.active = false; s.id = -1; input.mx = input.my = 0;
-    const rect = zone.getBoundingClientRect();
-    s.ox = s.x = rect.width * 0.32; s.oy = s.y = rect.height * 0.62; place();
-    base.classList.remove('on');
-  };
+  const resetMove = () => { mv.id = -1; input.stick.active = false; input.mx = input.my = 0; setKnob(0, 0); base.classList.remove('on'); };
   zone.addEventListener('touchstart', (e) => {
-    e.preventDefault();
-    const t = e.changedTouches[0], s = input.stick, rect = zone.getBoundingClientRect();
-    s.active = true; s.id = t.identifier; s.ox = s.x = t.clientX - rect.left; s.oy = s.y = t.clientY - rect.top; place();
-    base.classList.add('on');
+    e.preventDefault(); if (mv.id !== -1) return;
+    const t = e.changedTouches[0]; mv.id = t.identifier; input.stick.active = true; base.classList.add('on'); moveTo(t.clientX, t.clientY);
   }, { passive: false });
-  zone.addEventListener('touchmove', (e) => {
-    e.preventDefault();
-    const s = input.stick, rect = zone.getBoundingClientRect();
-    for (const t of e.changedTouches) if (t.identifier === s.id) {
-      s.x = t.clientX - rect.left; s.y = t.clientY - rect.top;
-      // 손가락이 멀리 가면 원점이 따라감
-      const dx = s.x - s.ox, dy = s.y - s.oy, l = Math.hypot(dx, dy), r = R() * 1.6;
-      if (l > r) { s.ox = s.x - dx / l * r; s.oy = s.y - dy / l * r; }
-      place();
-    }
-  }, { passive: false });
-  const end = (e) => { for (const t of e.changedTouches) if (t.identifier === input.stick.id) resetStick(); };
-  zone.addEventListener('touchend', end); zone.addEventListener('touchcancel', end);
-  setTimeout(resetStick, 50);
-  window.addEventListener('resize', () => setTimeout(resetStick, 100));
+  zone.addEventListener('touchmove', (e) => { e.preventDefault(); for (const t of e.changedTouches) if (t.identifier === mv.id) moveTo(t.clientX, t.clientY); }, { passive: false });
+  const endMv = (e) => { for (const t of e.changedTouches) if (t.identifier === mv.id) resetMove(); };
+  zone.addEventListener('touchend', endMv); zone.addEventListener('touchcancel', endMv);
+  window.addEventListener('resize', resetMove);
 
-  const bind = (sel, down, up) => {
+  const aimStick = (el, st, onTap, onRelease) => {
+    const k = el.querySelector('.knob');
+    let cx = 0, cy = 0, R = 1, dead = 14, lastL = 0;
+    const set = (dx, dy) => { k.style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`; };
+    const move = (x, y) => {
+      let dx = x - cx, dy = y - cy; const l = Math.hypot(dx, dy); lastL = l;
+      if (l > dead) { st.aiming = true; st.ang = Math.atan2(dy, dx); }
+      el.classList.toggle('cancel', st.aiming && l <= dead);
+      if (l > R) { dx *= R / l; dy *= R / l; }
+      set(dx, dy);
+    };
+    el.addEventListener('touchstart', (e) => {
+      e.preventDefault(); if (st.id !== -1) return;
+      const t = e.changedTouches[0], r = el.getBoundingClientRect();
+      cx = r.left + r.width / 2; cy = r.top + r.height / 2; R = r.width * 0.5; dead = Math.max(12, r.width * 0.16);
+      st.id = t.identifier; st.active = true; st.aiming = false; lastL = 0; el.classList.add('down');
+      move(t.clientX, t.clientY);
+    }, { passive: false });
+    el.addEventListener('touchmove', (e) => { e.preventDefault(); for (const t of e.changedTouches) if (t.identifier === st.id) move(t.clientX, t.clientY); }, { passive: false });
+    const end = (e) => {
+      for (const t of e.changedTouches) if (t.identifier === st.id) {
+        e.preventDefault();
+        if (!st.aiming) onTap();
+        else if (lastL > dead && e.type === 'touchend') { input.aimHold = { ang: st.ang, until: performance.now() + 220 }; onRelease(); }
+        st.id = -1; st.active = false; st.aiming = false; set(0, 0); el.classList.remove('down', 'cancel');
+      }
+    };
+    el.addEventListener('touchend', end, { passive: false }); el.addEventListener('touchcancel', end, { passive: false });
+  };
+  aimStick(root.querySelector('#tFire'), input.atk, () => { input.fireN++; input.tapFireUntil = performance.now() + 320; }, () => { input.fireN++; });
+  aimStick(root.querySelector('#tSkill'), input.skl, () => { input.skillN++; }, () => { input.skillN++; });
+
+  const bind = (sel, down) => {
     const el = root.querySelector(sel); if (!el) return;
     el.addEventListener('touchstart', (e) => { e.preventDefault(); el.classList.add('down'); down(); }, { passive: false });
-    const u = (e) => { e.preventDefault(); el.classList.remove('down'); if (up) up(); };
+    const u = (e) => { e.preventDefault(); el.classList.remove('down'); };
     el.addEventListener('touchend', u, { passive: false }); el.addEventListener('touchcancel', u, { passive: false });
   };
-  bind('#tFire', () => { input.touchFire = true; input.fire = true; input.fireN++; }, () => { input.touchFire = false; input.fire = false; });
   bind('#tMelee', () => { input.meleeN++; });
-  bind('#tSkill', () => { input.skillN++; });
   bind('#tTaunt', () => { input.tauntN++; });
   bind('#tReload', () => { input.reloadN++; });
 }
 
 export function clearInput() {
-  input.keys.clear(); input.fire = false; input.mx = input.my = 0; input.touchFire = false;
+  input.keys.clear(); input.fire = false; input.mx = input.my = 0; input.touchFire = false; input.aimHold = null; input.tapFireUntil = 0;
 }

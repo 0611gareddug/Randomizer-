@@ -410,6 +410,11 @@ $('fsBtn').onclick = async () => {
 let camSnap = true, lastAim = 0, fpsAcc = 0, fpsN = 0, fpsV = 60;
 function computeAim(W, me) {
   if (!me || !me.alive) return lastAim;
+  if (mobile) {
+    if (input.atk.aiming) return input.atk.ang;
+    if (input.skl.aiming) return input.skl.ang;
+    if (input.aimHold && performance.now() < input.aimHold.until) return input.aimHold.ang;
+  }
   if (!mobile && input.usedMouse) {
     const wpt = R.screenToWorld(input.mouseX * R.dpr, input.mouseY * R.dpr);
     return Math.atan2(wpt.y - me.y, wpt.x - me.x);
@@ -444,7 +449,9 @@ function frame(now) {
     const W = S.world, me = W.byId.get(S.myId);
     const aim = computeAim(W, me); lastAim = aim;
     const act = input.enabled && !paused;
-    S.setInput({ mx: act ? input.mx : 0, my: act ? input.my : 0, aim, fire: act && input.fire, fireN: input.fireN, meleeN: input.meleeN, skillN: input.skillN, tauntN: input.tauntN, reloadN: input.reloadN });
+    const autoW = me && PRIMARY[me.lo.p].auto;
+    const touchFire = mobile && ((input.atk.aiming && autoW) || now < input.tapFireUntil);
+    S.setInput({ mx: act ? input.mx : 0, my: act ? input.my : 0, aim, fire: act && (input.fire || touchFire), fireN: input.fireN, meleeN: input.meleeN, skillN: input.skillN, tauntN: input.tauntN, reloadN: input.reloadN });
     if (!paused) S.tick(dt, presenter);
     if (!inMatch || !S || !S.world) { requestAnimationFrame(frame); return; }
     // 카운트다운
@@ -471,7 +478,13 @@ function frame(now) {
     else { tx = W.map.pw / 2; ty = W.map.ph / 2; }
     R.updateCamera(tx, ty, dt, camSnap); camSnap = false;
     const ri = hud.reloadInfo || { reloading: false, rp: 1 };
-    R.render(W, me, dt, { event: W.event?.id, crosshair: !mobile && input.usedMouse ? { x: input.mouseX, y: input.mouseY } : null, reloading: ri.reloading, reloadPct: ri.rp });
+    let aimLine = null;
+    if (mobile && me && me.alive && (input.atk.aiming || input.skl.aiming)) {
+      const isSk = !input.atk.aiming, w = PRIMARY[me.lo.p], sk = SKILL[me.lo.s].id;
+      const len = isSk ? ({ blink: 90, strike: 140, dash: 70, turret: 14, banana: 18 }[sk] || 40) : Math.min(260, w.b.hitscan ? w.b.range : w.b.spd * w.b.life);
+      aimLine = { ang: aim, len, skill: isSk, spread: isSk ? 0 : (w.b.count ? w.b.spread : 0), circle: isSk && (sk === 'strike' || sk === 'blink') };
+    }
+    R.render(W, me, dt, { aimLine, event: W.event?.id, crosshair: !mobile && input.usedMouse ? { x: input.mouseX, y: input.mouseY } : null, reloading: ri.reloading, reloadPct: ri.rp });
     hud.update(S, W, me, dt, mobile);
     hud.minimap(W, me, dt, presenter.lastShot);
     hud.scoreboard(W, me, S, (boardHeld || boardToggle) && $('scrResult').classList.contains('hidden'));
