@@ -1,0 +1,249 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#141225">
+<meta name="description" content="룰렛 러시 - 리스폰할 때마다 장비가 랜덤으로 바뀌는 2D 픽셀 슬라임 난투 슈터">
+<title>룰렛 러시</title>
+<link rel="preconnect" href="https://cdn.jsdelivr.net">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/galmuri@2.40.3/dist/galmuri.css">
+<style>/*__CSS__*/</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+<div id="loading">불러오는 중…</div>
+<div id="ui">
+
+  <!-- 타이틀 -->
+  <section id="scrTitle" class="screen">
+    <div class="bgfx" id="bgfx"></div>
+    <div class="wrap">
+      <div class="custom">
+        <div class="logo"><span class="wheel">🎰</span> 룰렛 러시<small>ROULETTE RUSH</small></div>
+        <canvas id="preview" width="150" height="130"></canvas>
+        <input id="nick" class="inp" maxlength="10" placeholder="닉네임" style="text-align:center;width:calc(200px*var(--u))">
+        <div class="swatches" id="swatches"></div>
+        <div class="row" style="justify-content:center">
+          <div class="cycler">표정 <button class="btn s" data-cyc="face" data-d="-1">◀</button><span id="faceName"></span><button class="btn s" data-cyc="face" data-d="1">▶</button></div>
+          <div class="cycler">모자 <button class="btn s" data-cyc="hat" data-d="-1">◀</button><span id="hatName"></span><button class="btn s" data-cyc="hat" data-d="1">▶</button></div>
+        </div>
+      </div>
+      <div class="menu">
+        <button class="btn y wide" data-go="setup">⚔ 봇전 시작</button>
+        <button class="btn b" data-go="host">🏠 방 만들기</button>
+        <button class="btn b" data-go="join">🔑 방 참가</button>
+        <button class="btn g" data-go="range">🎯 무기 연습장</button>
+        <button class="btn" data-go="codex">📖 도감</button>
+        <button class="btn" data-go="stats">📊 전적</button>
+        <button class="btn" data-go="settings">⚙ 설정</button>
+        <button class="btn wide" data-go="help">❔ 조작법 · 규칙</button>
+      </div>
+    </div>
+    <div class="ver">룰렛 러시 v1.0 · 모든 그래픽과 사운드는 코드로 생성됩니다</div>
+  </section>
+
+  <!-- 봇전 설정 -->
+  <section id="scrSetup" class="screen hidden">
+    <div class="panel">
+      <h2>⚔ 봇전 설정</h2>
+      <div class="body col">
+        <div class="field"><span>모드</span><div class="seg" data-key="mode"><button data-v="dm">개인전</button><button data-v="tdm">팀전</button></div></div>
+        <div class="field"><span>맵</span><div class="seg" data-key="mapId"></div></div>
+        <div class="field"><span>봇 수</span><div class="seg" data-key="bots"><button data-v="1">1</button><button data-v="3">3</button><button data-v="5">5</button><button data-v="7">7</button></div></div>
+        <div class="field"><span>봇 난이도</span><div class="seg" data-key="botDiff"><button data-v="0">쉬움</button><button data-v="1">보통</button><button data-v="2">어려움</button></div></div>
+        <div class="field"><span>제한 시간</span><div class="seg" data-key="timeLimit"><button data-v="180">3분</button><button data-v="300">5분</button><button data-v="480">8분</button></div></div>
+        <div class="field"><span>목표 킬</span><div class="seg" data-key="killLimit"><button data-v="10">10</button><button data-v="20">20</button><button data-v="30">30</button><button data-v="0">없음</button></div></div>
+      </div>
+      <div class="row" style="justify-content:flex-end;margin-top:16px">
+        <button class="btn" data-go="title">뒤로</button>
+        <button class="btn y" id="startOffline">시작!</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- 방 참가 -->
+  <section id="scrJoin" class="screen hidden">
+    <div class="panel" style="max-width:440px">
+      <h2>🔑 방 참가</h2>
+      <p class="mute" style="margin:0 0 12px;font-size:calc(13px*var(--u))">친구에게 받은 5자리 방 코드를 입력하세요.</p>
+      <input id="joinCode" class="inp" maxlength="5" placeholder="ABCDE" style="font-size:calc(28px*var(--u));letter-spacing:8px;text-align:center;text-transform:uppercase">
+      <div class="row" style="justify-content:flex-end;margin-top:16px">
+        <button class="btn" data-go="title">뒤로</button>
+        <button class="btn y" id="joinBtn">참가</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- 로비 -->
+  <section id="scrLobby" class="screen hidden">
+    <div class="panel">
+      <div class="row" style="justify-content:space-between;margin-bottom:10px">
+        <h2 style="margin:0">🏠 대기실</h2>
+        <div class="row"><span class="mute" style="font-size:calc(12px*var(--u))">방 코드</span><span class="codeBox" id="roomCode">-----</span><button class="btn s" id="copyCode">복사</button><button class="btn s" id="copyLink">초대 링크</button></div>
+      </div>
+      <div class="body lobbyGrid">
+        <div class="col">
+          <h3 style="margin:0">참가자 <span id="pCount"></span></h3>
+          <div class="plist" id="plist"></div>
+          <div class="chatBox"><div class="chatLog" id="lobbyChat"></div>
+            <div class="row" style="flex-wrap:nowrap"><input class="inp" id="lobbyChatIn" maxlength="60" placeholder="채팅" style="flex:1"><button class="btn s" id="lobbyChatSend">전송</button></div></div>
+        </div>
+        <div class="col" id="lobbySettings">
+          <h3 style="margin:0">방 설정 <span class="mute" id="hostOnly" style="font-size:.8em"></span></h3>
+          <div class="field"><span>모드</span><div class="seg" data-lkey="mode"><button data-v="dm">개인전</button><button data-v="tdm">팀전</button></div></div>
+          <div class="field"><span>맵</span><div class="seg" data-lkey="mapId"></div></div>
+          <div class="field"><span>봇 채우기</span><div class="seg" data-lkey="bots"><button data-v="0">끔</button><button data-v="4">4명까지</button><button data-v="6">6명까지</button><button data-v="8">8명까지</button></div></div>
+          <div class="field"><span>봇 난이도</span><div class="seg" data-lkey="botDiff"><button data-v="0">쉬움</button><button data-v="1">보통</button><button data-v="2">어려움</button></div></div>
+          <div class="field"><span>제한 시간</span><div class="seg" data-lkey="timeLimit"><button data-v="180">3분</button><button data-v="300">5분</button><button data-v="480">8분</button></div></div>
+          <div class="field"><span>목표 킬</span><div class="seg" data-lkey="killLimit"><button data-v="10">10</button><button data-v="20">20</button><button data-v="30">30</button><button data-v="0">없음</button></div></div>
+          <div class="field"><span>팀킬</span><div class="seg" data-lkey="ff"><button data-v="false">끔</button><button data-v="true">켬</button></div></div>
+        </div>
+      </div>
+      <div class="row" style="justify-content:space-between;margin-top:14px">
+        <button class="btn r" id="leaveLobby">나가기</button>
+        <span class="mute" id="lobbyStatus" style="font-size:calc(12px*var(--u))"></span>
+        <button class="btn y" id="startOnline">게임 시작!</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- 도감 -->
+  <section id="scrCodex" class="screen hidden">
+    <div class="panel">
+      <div class="row" style="justify-content:space-between"><h2>📖 무기 도감</h2><span class="mute" id="codexProg"></span></div>
+      <div class="tabs" id="codexTabs"></div>
+      <div class="body"><div class="grid" id="codexGrid"></div></div>
+      <div class="detail" id="codexDetail"></div>
+      <div class="row" style="justify-content:flex-end;margin-top:12px"><button class="btn" data-go="title">뒤로</button></div>
+    </div>
+  </section>
+
+  <!-- 전적 -->
+  <section id="scrStats" class="screen hidden">
+    <div class="panel">
+      <h2>📊 내 전적</h2>
+      <div class="body"><div class="statGrid" id="statGrid"></div></div>
+      <div class="row" style="justify-content:space-between;margin-top:14px"><button class="btn r s" id="resetStats">기록 초기화</button><button class="btn" data-go="title">뒤로</button></div>
+    </div>
+  </section>
+
+  <!-- 설정 -->
+  <section id="scrSettings" class="screen hidden">
+    <div class="panel" style="max-width:520px">
+      <h2>⚙ 설정</h2>
+      <div class="body">
+        <div class="setRow"><span>효과음</span><input type="range" min="0" max="100" id="setSfx"></div>
+        <div class="setRow"><span>배경음악</span><input type="range" min="0" max="100" id="setMusic"></div>
+        <div class="setRow"><span>화면 흔들림</span><div class="seg" data-skey="shake"><button data-v="true">켬</button><button data-v="false">끔</button></div></div>
+        <div class="setRow"><span>데미지 숫자</span><div class="seg" data-skey="dmgNum"><button data-v="true">켬</button><button data-v="false">끔</button></div></div>
+        <div class="setRow"><span>저사양 모드 <small class="mute">(파티클·해상도 감소)</small></span><div class="seg" data-skey="lowSpec"><button data-v="false">끔</button><button data-v="true">켬</button></div></div>
+        <div class="setRow"><span>FPS 표시</span><div class="seg" data-skey="fps"><button data-v="false">끔</button><button data-v="true">켬</button></div></div>
+        <div class="setRow"><span>모바일 버튼 크기</span><div class="seg" data-skey="btnSize"><button data-v="0.85">작게</button><button data-v="1">보통</button><button data-v="1.2">크게</button></div></div>
+        <div class="setRow"><span>모바일 조준</span><div class="seg" data-skey="aimAssist"><button data-v="true">자동 조준</button><button data-v="false">이동 방향</button></div></div>
+      </div>
+      <div class="row" style="justify-content:flex-end;margin-top:14px"><button class="btn" id="settingsBack">확인</button></div>
+    </div>
+  </section>
+
+  <!-- 조작법 -->
+  <section id="scrHelp" class="screen hidden">
+    <div class="panel">
+      <h2>❔ 조작법 · 규칙</h2>
+      <div class="body help">
+        <b style="color:var(--acc)">🎰 핵심 규칙</b>
+        <ul>
+          <li>부활할 때마다 <b>주무기 · 근접 · 스킬 · 도발</b> 4칸이 룰렛으로 무작위 결정돼요.</li>
+          <li>등급: <span style="color:var(--r0)">일반</span> · <span style="color:var(--r1)">희귀</span> · <span style="color:var(--r2)">영웅</span> · <span style="color:var(--r3)">전설</span> — 높을수록 강하지만 일반으로도 충분히 이길 수 있어요.</li>
+          <li>적을 처치하면 체력 25 회복. 5초간 맞지 않으면 체력이 천천히 차올라요. 맵의 피자·우유·젤리로도 회복!</li>
+          <li><b style="color:var(--acc)">보급품</b>이 주기적으로 떨어져요. 먼저 먹으면 <b style="color:var(--r3)">전설 장비</b> 확정!</li>
+          <li>약 1분마다 <b>랜덤 맵 이벤트</b>(미끄럼, 거대화, 총알 2배속, 안개, 회복의 비, 꼬마화)가 발동해요.</li>
+          <li>도발을 끝까지 추면 체력 10 회복. 대신 공격하면 취소돼요.</li>
+        </ul>
+        <b style="color:var(--acc)">⌨ PC</b>
+        <ul>
+          <li><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> 이동 · <kbd>마우스</kbd> 조준 · <kbd>좌클릭</kbd> 발사</li>
+          <li><kbd>Q</kbd> 또는 <kbd>우클릭</kbd> 근접 · <kbd>E</kbd>/<kbd>Space</kbd> 스킬 · <kbd>F</kbd> 도발 · <kbd>R</kbd> 재장전</li>
+          <li><kbd>Tab</kbd> 점수판 · <kbd>Enter</kbd> 채팅 · <kbd>V</kbd> 빠른 채팅 · <kbd>Esc</kbd> 메뉴</li>
+        </ul>
+        <b style="color:var(--acc)">📱 모바일</b>
+        <ul>
+          <li>왼쪽 아무 곳이나 눌러 <b>이동 스틱</b> · 오른쪽 🔥 버튼을 누르고 있으면 <b>가장 가까운 적을 자동 조준</b>해 발사</li>
+          <li>근접 · 스킬 · 도발 버튼에는 지금 장비 아이콘과 쿨다운이 표시돼요.</li>
+          <li>오른쪽 위 ⛶ 버튼으로 전체화면. 가로 화면으로 즐겨 주세요.</li>
+        </ul>
+        <b style="color:var(--acc)">🌐 온라인</b>
+        <ul><li>방 만들기 → 5자리 코드를 친구에게 공유 → 친구는 방 참가에서 코드 입력. 최대 8명, 빈자리는 봇이 채워요.</li></ul>
+      </div>
+      <div class="row" style="justify-content:flex-end;margin-top:12px"><button class="btn y" id="helpBack">알겠어요!</button></div>
+    </div>
+  </section>
+
+  <!-- 인게임 HUD -->
+  <div id="hud" class="hidden">
+    <canvas id="minimap" width="144" height="96"></canvas>
+    <div class="ping" id="ping"></div>
+    <div class="top">
+      <div class="timer"><div class="ts red hidden" id="tsRed">0</div><div class="t" id="timer">5:00</div><div class="ts blue hidden" id="tsBlue">0</div></div>
+      <div class="goal" id="goal"></div>
+      <div class="evBanner hidden" id="evBanner"></div>
+    </div>
+    <div id="killfeed"></div>
+    <div id="announce"></div>
+    <div id="bigText"></div>
+    <div id="deathInfo" class="hidden"></div>
+    <div id="chatLog"></div>
+    <div id="chatInputWrap" class="hidden"><input id="chatIn" class="inp" maxlength="60" placeholder="메시지 (Enter 전송, Esc 취소)"><button class="btn s" id="chatSend">전송</button></div>
+    <div id="quick" class="hidden"></div>
+    <div class="bottom">
+      <div class="hpWrap"><div class="hpBar"><i class="lag" id="hpLag"></i><i id="hpFill"></i><span id="hpText">100</span></div></div>
+      <div class="slots" id="slots"></div>
+    </div>
+    <div class="hudBtns"><button class="btn s icoBtn" id="btnChat" title="채팅">💬</button><button class="btn s icoBtn" id="btnBoard" title="점수판">🏆</button><button class="btn s icoBtn" id="btnMenu" title="메뉴">☰</button></div>
+  </div>
+  <div id="roulette" class="hidden"><div class="title" id="rouTitle">장비 룰렛!</div><div class="reels" id="reels"></div></div>
+  <div id="lootPop" class="panel hidden"></div>
+  <div id="scoreboard" class="panel hidden"></div>
+  <div id="rangePanel" class="panel hidden"></div>
+
+  <section id="scrPause" class="screen over hidden">
+    <div class="panel" style="max-width:340px">
+      <h2>☰ 메뉴</h2>
+      <div class="col">
+        <button class="btn y" id="resume">계속하기</button>
+        <button class="btn" id="pauseHelp">조작법</button>
+        <button class="btn" id="pauseSettings">설정</button>
+        <button class="btn r" id="quit">나가기</button>
+      </div>
+    </div>
+  </section>
+
+  <section id="scrResult" class="screen over hidden">
+    <div class="panel">
+      <div class="resultHead" id="resHead">승리!</div>
+      <div class="body" id="resBody"></div>
+      <div class="row" style="justify-content:space-between;margin-top:14px">
+        <span class="mute" id="resNote" style="font-size:calc(12px*var(--u))"></span>
+        <div class="row"><button class="btn" id="resMenu">메뉴로</button><button class="btn y" id="resAgain">다시 하기</button></div>
+      </div>
+    </div>
+  </section>
+
+  <div id="touch" class="hidden">
+    <div id="stickZone"><div id="stickBase"></div><div id="stickKnob"></div></div>
+    <button class="tb" id="tFire"><img alt=""><span class="cd"></span><span class="amt"></span><span class="lbl">발사</span></button>
+    <button class="tb" id="tMelee"><img alt=""><span class="cd"></span><span class="lbl">근접</span></button>
+    <button class="tb" id="tSkill"><img alt=""><span class="cd"></span><span class="lbl">스킬</span></button>
+    <button class="tb" id="tTaunt"><img alt=""><span class="cd"></span><span class="lbl">도발</span></button>
+    <button class="tb" id="tReload">⟳</button>
+  </div>
+</div>
+<button class="btn s icoBtn" id="fsBtn" title="전체화면">⛶</button>
+<div id="rotate"><div class="ph"></div>휴대폰을 가로로 돌려 주세요!</div>
+<div id="toast" class="hidden"></div>
+<script>/*__JS__*/</script>
+</body>
+</html>

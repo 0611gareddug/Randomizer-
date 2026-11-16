@@ -1,0 +1,18 @@
+{
+  "name": "roulette-rush",
+  "version": "1.0.0",
+  "private": true,
+  "description": "룰렛 러시 - 리스폰마다 장비가 바뀌는 2D 픽셀 슬라임 난투 슈터",
+  "scripts": {
+    "build": "node build.mjs",
+    "build:dev": "node build.mjs --dev"
+  },
+  "devDependencies": {
+    "esbuild": "0.25.12",
+    "javascript-obfuscator": "4.1.1"
+  },
+  "dependencies": {
+    "peerjs": "1.5.5"
+  },
+  "type": "module"
+}
